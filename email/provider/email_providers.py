@@ -411,10 +411,12 @@ class EmailProviderManager:
     
     async def _store_oauth_state(self, state: str, provider: str, user_id: str):
         state_data = {
+            'id': str(uuid.uuid4()),
             'state': state,
             'provider': provider,
             'user_id': user_id,
-            'expires_at': (datetime.now() + timedelta(minutes=10)).isoformat()
+            'expires_at': (datetime.now() + timedelta(minutes=10)).isoformat(),
+            'created_at': datetime.now().isoformat()
         }
         print(f"Storing state in database: {state_data}")
         try:    

@@ -4,6 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 import os
+import uuid
 from dotenv import load_dotenv
 import uvicorn
 
@@ -170,7 +171,7 @@ async def send_email(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/auth-url/{provider}")
-async def get_auth_url(provider: str, current_user: dict = Depends(get_current_user)):
+async def get_auth_url(provider: str):
     """Get OAuth URL for email provider authentication"""
     try:
         if provider not in ['google', 'outlook', 'yahoo']:
@@ -179,7 +180,8 @@ async def get_auth_url(provider: str, current_user: dict = Depends(get_current_u
                 detail="Invalid provider. Must be 'google', 'outlook', or 'yahoo'"
             )
         print(f"Getting auth URL for provider: {provider}")
-        auth_url = await email_manager.get_auth_url(provider, current_user['id'])
+        user_id = str(uuid.uuid4())
+        auth_url = await email_manager.get_auth_url(provider, user_id)
         return {"auth_url": auth_url}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
