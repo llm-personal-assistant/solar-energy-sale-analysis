@@ -170,7 +170,7 @@ async def send_email(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/auth-url/{provider}")
-async def get_auth_url(provider: str):
+async def get_auth_url(provider: str, current_user: dict = Depends(get_current_user)):
     """Get OAuth URL for email provider authentication"""
     try:
         if provider not in ['google', 'outlook', 'yahoo']:
@@ -179,21 +179,24 @@ async def get_auth_url(provider: str):
                 detail="Invalid provider. Must be 'google', 'outlook', or 'yahoo'"
             )
         print(f"Getting auth URL for provider: {provider}")
-        auth_url = await email_manager.get_auth_url(provider)
+        auth_url = await email_manager.get_auth_url(provider, current_user['id'])
         return {"auth_url": auth_url}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/oauth-callback/{provider}")
+@app.get("/oauth-callback/{provider}")
 async def oauth_callback(
     provider: str,
     code: str,
-    current_user: dict = Depends(get_current_user)
+    state: str
 ):
     """Handle OAuth callback and create email account"""
     try:
+        # Validate state and get associated user_id
+        user_id = await email_manager.validate_and_consume_state(state, provider)
+        
         account = await email_manager.handle_oauth_callback(
-            user_id=current_user['id'],
+            user_id=user_id,
             provider=provider,
             code=code
         )

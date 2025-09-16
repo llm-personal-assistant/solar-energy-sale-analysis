@@ -27,16 +27,6 @@ def get_supabase_client() -> SupabaseClient:
         _supabase_client = SupabaseClient()
     return _supabase_client
 
-from postgrest import APIError
-import httpx
-
-def supabase_health(client):
-    try:
-        res = client.rpc("ping", {}).execute()
-        return res.data == "pong" or res.data == [{"ping":"pong"}]  # 兼容不同返回包装
-    except (APIError, httpx.HTTPError) as e:
-        print("Health check failed:", e)
-        return False
 
 if __name__ == "__main__":
     client = get_supabase_client()

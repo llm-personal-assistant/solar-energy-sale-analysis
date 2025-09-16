@@ -1,6 +1,6 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-supabase==2.3.0
+fastapi
+uvicorn
+supabase
 python-dotenv==1.0.0
 pydantic==2.9.2
 httpx==0.24.0
@@ -12,4 +12,4 @@ msal==1.24.1
 requests==2.31.0
 python-multipart==0.0.6
 email-validator==2.1.0
-cryptography==43.0.3
+cryptography

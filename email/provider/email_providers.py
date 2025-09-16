@@ -310,7 +310,7 @@ class EmailProviderManager:
         }
         self.supabase = get_supabase_client().get_client()
     
-    async def get_auth_url(self, provider: str) -> str:
+    async def get_auth_url(self, provider: str, user_id: str) -> str:
         if provider not in self.providers:
             raise ValueError(f"Unsupported provider: {provider}")
         
@@ -318,9 +318,9 @@ class EmailProviderManager:
         state = str(uuid.uuid4())
         print(f"State: {state}")
         
-        # Store state in database
-        await self._store_oauth_state(state, provider)
-        print(f"Storing state in database")
+        # Store state in database with user_id
+        await self._store_oauth_state(state, provider, user_id)
+        print(f"Storing state in database with user_id {user_id}")
         return self.providers[provider].get_auth_url(state)
     
     async def handle_oauth_callback(self, user_id: str, provider: str, code: str) -> Dict[str, Any]:
@@ -409,15 +409,19 @@ class EmailProviderManager:
         
         return message_id
     
-    async def _store_oauth_state(self, state: str, provider: str):
+    async def _store_oauth_state(self, state: str, provider: str, user_id: str):
         state_data = {
             'state': state,
             'provider': provider,
+            'user_id': user_id,
             'expires_at': (datetime.now() + timedelta(minutes=10)).isoformat()
         }
         print(f"Storing state in database: {state_data}")
-        self.supabase.table('oauth_states').insert(state_data).execute()
-        print(f"State stored in database")
+        try:    
+            self.supabase.table('oauth_states').insert(state_data).execute()
+            print(f"State stored in database")
+        except Exception as e:
+            print(f"Error storing state in database: {e}")
     
     async def _get_user_email_from_provider(self, provider: str, access_token: str) -> str:
         if provider == 'google':
@@ -443,3 +447,26 @@ class EmailProviderManager:
         else:
             # For Yahoo, this would need to be implemented based on their API
             return "user@yahoo.com"  # Placeholder
+    
+    async def validate_and_consume_state(self, state: str, provider: str) -> str:
+        """Validate the OAuth state and return the associated user_id. Consume the state on success."""
+        # Find matching state
+        result = self.supabase.table('oauth_states').select('*').eq('state', state).eq('provider', provider).execute()
+        if not result.data:
+            raise ValueError("Invalid OAuth state")
+        record = result.data[0]
+        # Check expiry
+        try:
+            expires_at = datetime.fromisoformat(record['expires_at'])
+        except Exception:
+            raise ValueError("Malformed OAuth state expiry")
+        if expires_at < datetime.now():
+            # Cleanup expired state
+            self.supabase.table('oauth_states').delete().eq('id', record['id']).execute()
+            raise ValueError("OAuth state has expired")
+        user_id = record.get('user_id')
+        if not user_id:
+            raise ValueError("OAuth state is missing user association")
+        # Consume state
+        self.supabase.table('oauth_states').delete().eq('id', record['id']).execute()
+        return user_id
