@@ -195,8 +195,11 @@ async def oauth_callback(
     """Handle OAuth callback and create email account"""
     try:
         # Validate state and get associated user_id
+        print(f"Validating state: {state} for provider: {provider}")
+        print(f"Code: {code}")
+
         user_id = await email_manager.validate_and_consume_state(state, provider)
-        
+        print(f"User ID: {user_id}")
         account = await email_manager.handle_oauth_callback(
             user_id=user_id,
             provider=provider,

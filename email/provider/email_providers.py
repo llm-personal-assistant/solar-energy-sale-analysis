@@ -2,7 +2,7 @@ import os
 import base64
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import httpx
 from google.auth.transport.requests import Request
@@ -23,10 +23,14 @@ class GoogleEmailProvider:
         self.client_id = os.getenv("GOOGLE_CLIENT_ID")
         self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/oauth-callback/google")
+        # Allow insecure transport for local development with http redirect URIs
+        if self.redirect_uri.startswith("http://"):
+            os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
         self.scopes = [
             'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.send',
-            'https://www.googleapis.com/auth/userinfo.email'
+            'https://www.googleapis.com/auth/userinfo.email',
+            'openid'
         ]
     
     def get_auth_url(self, state: str) -> str:
@@ -66,11 +70,19 @@ class GoogleEmailProvider:
             },
             scopes=self.scopes
         )
+        print(f"Flow: {flow}")
         flow.redirect_uri = self.redirect_uri
-        
-        flow.fetch_token(code=code)
+        print(f"Redirect URI: {self.redirect_uri}")
+        print(f"Code: {code}")
+        try:
+            flow.fetch_token(code=code)
+        except Exception as e:
+            print(f"Error: {e}")
+            # Add more context for debugging token exchange failures
+            raise RuntimeError(f"Failed to exchange code for tokens: {e}")
+        print(f"code: {code}")
         credentials = flow.credentials
-        
+        print(f"Credentials: {credentials}")
         return {
             "access_token": credentials.token,
             "refresh_token": credentials.refresh_token
@@ -326,12 +338,14 @@ class EmailProviderManager:
     async def handle_oauth_callback(self, user_id: str, provider: str, code: str) -> Dict[str, Any]:
         if provider not in self.providers:
             raise ValueError(f"Unsupported provider: {provider}")
-        
+        print(f"Handling OAuth callback for provider: {provider}")
         # Exchange code for tokens
         tokens = await self.providers[provider].exchange_code_for_tokens(code)
+        print(f"Tokens: {tokens}")
         
         # Get user email from provider
         user_email = await self._get_user_email_from_provider(provider, tokens['access_token'])
+        print(f"User email: {user_email}")
         
         # Create email account
         return await self.create_email_account(
@@ -411,12 +425,10 @@ class EmailProviderManager:
     
     async def _store_oauth_state(self, state: str, provider: str, user_id: str):
         state_data = {
-            'id': str(uuid.uuid4()),
             'state': state,
             'provider': provider,
             'user_id': user_id,
-            'expires_at': (datetime.now() + timedelta(minutes=10)).isoformat(),
-            'created_at': datetime.now().isoformat()
+            'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
         }
         print(f"Storing state in database: {state_data}")
         try:    
@@ -460,9 +472,12 @@ class EmailProviderManager:
         # Check expiry
         try:
             expires_at = datetime.fromisoformat(record['expires_at'])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
         except Exception:
             raise ValueError("Malformed OAuth state expiry")
-        if expires_at < datetime.now():
+        now_utc = datetime.now(timezone.utc)
+        if expires_at < now_utc:
             # Cleanup expired state
             self.supabase.table('oauth_states').delete().eq('id', record['id']).execute()
             raise ValueError("OAuth state has expired")
