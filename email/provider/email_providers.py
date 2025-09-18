@@ -366,16 +366,16 @@ class EmailProviderManager:
             'is_active': True
         }
         
-        result = self.supabase.table('email_accounts').insert(account_data).execute()
+        result = self.supabase.schema('email_provider').from_('email_accounts').insert(account_data).execute()
         return result.data[0]
     
     async def get_user_email_accounts(self, user_id: str) -> List[Dict[str, Any]]:
-        result = self.supabase.table('email_accounts').select('*').eq('user_id', user_id).execute()
+        result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('user_id', user_id).execute()
         return result.data
     
     async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Get account details
-        account_result = self.supabase.table('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
         
         if not account_result.data:
             raise ValueError("Account not found")
@@ -398,13 +398,13 @@ class EmailProviderManager:
                 'timestamp': email['timestamp'],
                 'is_read': email['is_read']
             }
-            self.supabase.table('email_messages').upsert(email_data).execute()
+            self.supabase.schema('email_provider').from_('email_messages').upsert(email_data).execute()
         
         return emails
     
     async def send_email(self, user_id: str, account_id: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
         # Get account details
-        account_result = self.supabase.table('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.supabase.schema('email_provider').from_('email_provider.email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
         
         if not account_result.data:
             raise ValueError("Account not found")
@@ -432,7 +432,7 @@ class EmailProviderManager:
         }
         print(f"Storing state in database: {state_data}")
         try:    
-            self.supabase.table('oauth_states').insert(state_data).execute()
+            self.supabase.schema('email_provider').from_('oauth_states').insert(state_data).execute()
             print(f"State stored in database")
         except Exception as e:
             print(f"Error storing state in database: {e}")
@@ -465,7 +465,7 @@ class EmailProviderManager:
     async def validate_and_consume_state(self, state: str, provider: str) -> str:
         """Validate the OAuth state and return the associated user_id. Consume the state on success."""
         # Find matching state
-        result = self.supabase.table('oauth_states').select('*').eq('state', state).eq('provider', provider).execute()
+        result = self.supabase.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).execute()
         if not result.data:
             raise ValueError("Invalid OAuth state")
         record = result.data[0]
@@ -479,11 +479,11 @@ class EmailProviderManager:
         now_utc = datetime.now(timezone.utc)
         if expires_at < now_utc:
             # Cleanup expired state
-            self.supabase.table('oauth_states').delete().eq('id', record['id']).execute()
+            self.supabase.schema('email_provider').from_('oauth_states').delete().eq('id', record['id']).execute()
             raise ValueError("OAuth state has expired")
         user_id = record.get('user_id')
         if not user_id:
             raise ValueError("OAuth state is missing user association")
         # Consume state
-        self.supabase.table('oauth_states').delete().eq('id', record['id']).execute()
+        self.supabase.schema('email_provider').from_('oauth_states').delete().eq('id', record['id']).execute()
         return user_id

@@ -10,8 +10,13 @@ import uvicorn
 
 from supabase_client import get_supabase_client
 from email_providers import EmailProviderManager
-from auth import verify_token, get_current_user
 from models import User, EmailAccount, EmailMessage
+
+# Import auth module from parent directory
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from auth import auth_router, get_current_user_from_token
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +41,9 @@ security = HTTPBearer()
 
 # Initialize email provider manager
 email_manager = EmailProviderManager()
+
+# Include auth router
+app.include_router(auth_router)
 
 # Pydantic models for API
 class UserRegistration(BaseModel):
@@ -73,7 +81,7 @@ async def root():
 @app.post("/register-email-provider", response_model=EmailAccountResponse)
 async def register_email_provider(
     registration: UserRegistration,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user_from_token)
 ):
     """Register a new email provider for the user"""
     try:
@@ -86,7 +94,7 @@ async def register_email_provider(
         
         # Create email account
         account = await email_manager.create_email_account(
-            user_id=current_user['id'],
+            user_id=current_user.id,
             email=registration.email,
             provider=registration.provider,
             access_token=registration.access_token,
@@ -105,10 +113,10 @@ async def register_email_provider(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/email-accounts", response_model=List[EmailAccountResponse])
-async def get_email_accounts(current_user: dict = Depends(get_current_user)):
+async def get_email_accounts(current_user = Depends(get_current_user_from_token)):
     """Get all email accounts for the current user"""
     try:
-        accounts = await email_manager.get_user_email_accounts(current_user['id'])
+        accounts = await email_manager.get_user_email_accounts(current_user.id)
         return [
             EmailAccountResponse(
                 id=account['id'],
@@ -126,12 +134,12 @@ async def get_email_accounts(current_user: dict = Depends(get_current_user)):
 async def get_emails(
     account_id: str,
     limit: int = 50,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user_from_token)
 ):
     """Get emails from a specific account"""
     try:
         emails = await email_manager.get_emails(
-            user_id=current_user['id'],
+            user_id=current_user.id,
             account_id=account_id,
             limit=limit
         )
@@ -154,12 +162,12 @@ async def get_emails(
 async def send_email(
     account_id: str,
     email_request: SendEmailRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user_from_token)
 ):
     """Send email using a specific account"""
     try:
         result = await email_manager.send_email(
-            user_id=current_user['id'],
+            user_id=current_user.id,
             account_id=account_id,
             to_emails=email_request.to,
             subject=email_request.subject,
