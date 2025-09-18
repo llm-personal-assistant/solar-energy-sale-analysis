@@ -18,6 +18,43 @@ import smtplib
 
 from supabase_client import get_supabase_client
 
+def _parse_email_timestamp(timestamp_str: str) -> str:
+    """Parse email timestamp from various formats to ISO 8601"""
+    if not timestamp_str:
+        return datetime.now().isoformat()
+    
+    try:
+        # Try parsing RFC 2822 format (Gmail format)
+        # "Thu, 18 Sep 2025 16:00:51 +0000 (UTC)"
+        if '(' in timestamp_str and ')' in timestamp_str:
+            # Remove timezone info in parentheses
+            clean_timestamp = timestamp_str.split('(')[0].strip()
+            dt = datetime.strptime(clean_timestamp, '%a, %d %b %Y %H:%M:%S %z')
+            return dt.isoformat()
+        
+        # Try other common formats
+        formats = [
+            '%a, %d %b %Y %H:%M:%S %z',  # RFC 2822
+            '%Y-%m-%d %H:%M:%S',         # Simple format
+            '%Y-%m-%dT%H:%M:%S',         # ISO without timezone
+            '%Y-%m-%dT%H:%M:%SZ',        # ISO with Z
+            '%Y-%m-%dT%H:%M:%S.%fZ',     # ISO with microseconds
+        ]
+        
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(timestamp_str, fmt)
+                return dt.isoformat()
+            except ValueError:
+                continue
+                
+        # If all parsing fails, return current time
+        return datetime.now().isoformat()
+        
+    except Exception:
+        return datetime.now().isoformat()
+
+
 class GoogleEmailProvider:
     def __init__(self):
         self.client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -51,6 +88,7 @@ class GoogleEmailProvider:
         print(f"Redirect URI: {self.redirect_uri}")
         auth_url, _ = flow.authorization_url(
             access_type='offline',
+            prompt='consent',
             include_granted_scopes='true',
             state=state
         )
@@ -88,8 +126,92 @@ class GoogleEmailProvider:
             "refresh_token": credentials.refresh_token
         }
     
-    async def get_emails(self, access_token: str, limit: int = 50) -> List[Dict[str, Any]]:
-        credentials = Credentials(token=access_token)
+    async def get_emails(self, access_token: str, limit: int = 50, refresh_token: str = None) -> List[Dict[str, Any]]:
+        credentials = Credentials(
+            token=access_token,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=self.client_id,
+            client_secret=self.client_secret
+        )
+        service = build('gmail', 'v1', credentials=credentials)
+        
+        # Get list of messages
+        results = service.users().messages().list(userId='me', maxResults=limit).execute()
+        messages = results.get('messages', [])
+        
+        emails = []
+        for message in messages:
+            msg = service.users().messages().get(userId='me', id=message['id']).execute()
+            
+            # Extract headers
+            headers = msg['payload'].get('headers', [])
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+            recipient = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown Recipient')
+            date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+            
+            # Extract body
+            body = self._extract_body(msg['payload'])
+            
+            emails.append({
+                'id': message['id'],
+                'subject': subject,
+                'sender': sender,
+                'recipient': recipient,
+                'body': body,
+                'timestamp': _parse_email_timestamp(date),
+                'is_read': 'UNREAD' not in msg['labelIds']
+            })
+        
+        return emails
+    
+    def _extract_body(self, payload: Dict) -> str:
+        """Extract email body from Gmail API payload"""
+        body = ""
+        
+        if 'parts' in payload:
+            for part in payload['parts']:
+                if part['mimeType'] == 'text/plain':
+                    data = part['body'].get('data')
+                    if data:
+                        body = base64.urlsafe_b64decode(data).decode('utf-8')
+                        break
+        else:
+            if payload['mimeType'] == 'text/plain':
+                data = payload['body'].get('data')
+                if data:
+                    body = base64.urlsafe_b64decode(data).decode('utf-8')
+        
+        return body
+    
+    async def send_email(self, access_token: str, to_emails: List[str], subject: str, body: str, is_html: bool = False, refresh_token: str = None) -> str:
+        credentials = Credentials(
+            token=access_token,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=self.client_id,
+            client_secret=self.client_secret
+        )
+        service = build('gmail', 'v1', credentials=credentials)
+        
+        # Create message
+        message = MIMEText(body, 'html' if is_html else 'plain')
+        message['to'] = ', '.join(to_emails)
+        message['subject'] = subject
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        
+        # Send message
+        result = service.users().messages().send(
+            userId='me',
+            body={'raw': raw_message}
+        ).execute()
+        
+        return result['id']
+    async def get_emails_with_credentials(self, credentials, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get emails using pre-configured credentials (for automatic refresh)"""
         service = build('gmail', 'v1', credentials=credentials)
         
         # Get list of messages
@@ -121,45 +243,7 @@ class GoogleEmailProvider:
             })
         
         return emails
-    
-    def _extract_body(self, payload: Dict) -> str:
-        """Extract email body from Gmail API payload"""
-        body = ""
-        
-        if 'parts' in payload:
-            for part in payload['parts']:
-                if part['mimeType'] == 'text/plain':
-                    data = part['body'].get('data')
-                    if data:
-                        body = base64.urlsafe_b64decode(data).decode('utf-8')
-                        break
-        else:
-            if payload['mimeType'] == 'text/plain':
-                data = payload['body'].get('data')
-                if data:
-                    body = base64.urlsafe_b64decode(data).decode('utf-8')
-        
-        return body
-    
-    async def send_email(self, access_token: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
-        credentials = Credentials(token=access_token)
-        service = build('gmail', 'v1', credentials=credentials)
-        
-        # Create message
-        message = MIMEText(body, 'html' if is_html else 'plain')
-        message['to'] = ', '.join(to_emails)
-        message['subject'] = subject
-        
-        # Encode message
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
-        
-        # Send message
-        result = service.users().messages().send(
-            userId='me',
-            body={'raw': raw_message}
-        ).execute()
-        
-        return result['id']
+
 
 class OutlookEmailProvider:
     def __init__(self):
@@ -321,6 +405,18 @@ class EmailProviderManager:
             'yahoo': YahooEmailProvider()
         }
         self.supabase = get_supabase_client().get_client()
+        self.admin = get_supabase_client().get_admin_client()
+        
+    
+    def _normalize_user_id(self, user_id) -> str:
+        try:
+            if isinstance(user_id, dict) and 'id' in user_id:
+                return str(user_id['id'])
+            if hasattr(user_id, 'id'):
+                return str(user_id.id)
+            return str(user_id)
+        except Exception:
+            return str(user_id)
     
     async def get_auth_url(self, provider: str, user_id: str) -> str:
         if provider not in self.providers:
@@ -331,21 +427,20 @@ class EmailProviderManager:
         print(f"State: {state}")
         
         # Store state in database with user_id
-        await self._store_oauth_state(state, provider, user_id)
-        print(f"Storing state in database with user_id {user_id}")
+        normalized_user_id = self._normalize_user_id(user_id)
+        await self._store_oauth_state(state, provider, normalized_user_id)
+        print(f"Storing state in database with user_id {normalized_user_id}")
         return self.providers[provider].get_auth_url(state)
     
     async def handle_oauth_callback(self, user_id: str, provider: str, code: str) -> Dict[str, Any]:
         if provider not in self.providers:
             raise ValueError(f"Unsupported provider: {provider}")
-        print(f"Handling OAuth callback for provider: {provider}")
+        
         # Exchange code for tokens
         tokens = await self.providers[provider].exchange_code_for_tokens(code)
-        print(f"Tokens: {tokens}")
         
         # Get user email from provider
         user_email = await self._get_user_email_from_provider(provider, tokens['access_token'])
-        print(f"User email: {user_email}")
         
         # Create email account
         return await self.create_email_account(
@@ -373,10 +468,64 @@ class EmailProviderManager:
         result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('user_id', user_id).execute()
         return result.data
     
+
+    async def _refresh_and_save_tokens(self, account_id: str, provider_name: str, credentials) -> Dict[str, str]:
+        """Refresh tokens and save to database"""
+        try:
+            # Refresh the credentials
+            credentials.refresh(Request())
+            
+            # Update the account with new tokens
+            update_data = {
+                'access_token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }
+            
+            self.supabase.schema('email_provider').from_('email_accounts').update(update_data).eq('id', account_id).execute()
+            print(f"Refreshed tokens for account {account_id}")
+            
+            return {
+                'access_token': credentials.token,
+                'refresh_token': credentials.refresh_token
+            }
+        except Exception as e:
+            print(f"Failed to refresh tokens: {e}")
+            raise ValueError(f"Token refresh failed: {e}")
+    
+    async def _get_credentials_with_refresh(self, account: Dict[str, Any], provider_name: str) -> Any:
+        """Get credentials with automatic refresh capability"""
+        provider = self.providers[provider_name]
+        
+        if provider_name == 'google':
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            
+            credentials = Credentials(
+                token=account['access_token'],
+                refresh_token=account.get('refresh_token'),
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=provider.client_id,
+                client_secret=provider.client_secret
+            )
+            
+            # Check if token is expired and refresh if needed
+            if not credentials.valid:
+                if credentials.expired and credentials.refresh_token:
+                    print(f"Token expired for account {account['id']}, refreshing...")
+                    await self._refresh_and_save_tokens(account['id'], provider_name, credentials)
+                else:
+                    raise ValueError("Token expired and no refresh token available")
+            
+            return credentials
+        else:
+            # For other providers, return the access token as-is
+            return account['access_token']
+
     async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Get account details
         account_result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
-        
+        print(f"account_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
         
@@ -384,7 +533,9 @@ class EmailProviderManager:
         provider = self.providers[account['provider']]
         
         # Get emails from provider
-        emails = await provider.get_emails(account['access_token'], limit)
+        print(f"account['access_token'] :{account['access_token']}")
+        emails = await provider.get_emails(account['access_token'], limit, account.get('refresh_token'))
+        print(f"account['access_token'] :")
         
         # Store emails in database
         for email in emails:
@@ -398,7 +549,8 @@ class EmailProviderManager:
                 'timestamp': email['timestamp'],
                 'is_read': email['is_read']
             }
-            self.supabase.schema('email_provider').from_('email_messages').upsert(email_data).execute()
+            print(email_data)
+            self.admin.schema('email_provider').from_('email_messages').upsert(email_data).execute()
         
         return emails
     
@@ -418,12 +570,14 @@ class EmailProviderManager:
             to_emails,
             subject,
             body,
-            is_html
+            is_html,
+            account.get('refresh_token')
         )
         
         return message_id
     
     async def _store_oauth_state(self, state: str, provider: str, user_id: str):
+        user_id = self._normalize_user_id(user_id)
         state_data = {
             'state': state,
             'provider': provider,
@@ -463,9 +617,9 @@ class EmailProviderManager:
             return "user@yahoo.com"  # Placeholder
     
     async def validate_and_consume_state(self, state: str, provider: str) -> str:
-        """Validate the OAuth state and return the associated user_id. Consume the state on success."""
+        """Validate the OAuth state and return the associated user_id. Persist verification metadata instead of deleting."""
         # Find matching state
-        result = self.supabase.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).execute()
+        result = self.supabase.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).limit(1).execute()
         if not result.data:
             raise ValueError("Invalid OAuth state")
         record = result.data[0]
@@ -476,14 +630,17 @@ class EmailProviderManager:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
         except Exception:
             raise ValueError("Malformed OAuth state expiry")
+
         now_utc = datetime.now(timezone.utc)
         if expires_at < now_utc:
-            # Cleanup expired state
-            self.supabase.schema('email_provider').from_('oauth_states').delete().eq('id', record['id']).execute()
             raise ValueError("OAuth state has expired")
+
         user_id = record.get('user_id')
         if not user_id:
             raise ValueError("OAuth state is missing user association")
-        # Consume state
-        self.supabase.schema('email_provider').from_('oauth_states').delete().eq('id', record['id']).execute()
+        # Mark as verified instead of deleting
+        self.supabase.schema('email_provider').from_('oauth_states').update({
+            'verified': True,
+            'verified_at': now_utc.isoformat()
+        }).eq('id', record['id']).execute()
         return user_id

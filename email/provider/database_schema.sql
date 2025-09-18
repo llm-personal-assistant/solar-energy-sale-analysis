@@ -48,8 +48,14 @@ CREATE TABLE IF NOT EXISTS oauth_states (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL CHECK (provider IN ('google', 'outlook', 'yahoo')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
+    verified_at TIMESTAMP WITH TIME ZONE
 );
+
+-- For existing deployments, run the following to add new columns:
+-- ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts(user_id);

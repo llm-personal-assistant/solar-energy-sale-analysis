@@ -16,7 +16,7 @@ from models import User, EmailAccount, EmailMessage
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from auth import auth_router, get_current_user_from_token
+from auth.routes import router, get_current_user_from_token
 
 # Load environment variables
 load_dotenv()
@@ -43,7 +43,7 @@ security = HTTPBearer()
 email_manager = EmailProviderManager()
 
 # Include auth router
-app.include_router(auth_router)
+app.include_router(router)
 
 # Pydantic models for API
 class UserRegistration(BaseModel):
@@ -138,11 +138,13 @@ async def get_emails(
 ):
     """Get emails from a specific account"""
     try:
+        print("1111111111111111111111")
         emails = await email_manager.get_emails(
             user_id=current_user.id,
             account_id=account_id,
             limit=limit
         )
+        print("222222222222222222222")
         return [
             EmailMessageResponse(
                 id=email['id'],
@@ -179,7 +181,7 @@ async def send_email(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/auth-url/{provider}")
-async def get_auth_url(provider: str):
+async def get_auth_url(provider: str, current_user = Depends(get_current_user_from_token)):
     """Get OAuth URL for email provider authentication"""
     try:
         if provider not in ['google', 'outlook', 'yahoo']:
@@ -189,7 +191,7 @@ async def get_auth_url(provider: str):
             )
         print(f"Getting auth URL for provider: {provider}")
         user_id = str(uuid.uuid4())
-        auth_url = await email_manager.get_auth_url(provider, user_id)
+        auth_url = await email_manager.get_auth_url(provider, current_user)
         return {"auth_url": auth_url}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

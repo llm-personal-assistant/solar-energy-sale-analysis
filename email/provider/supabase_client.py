@@ -8,15 +8,24 @@ class SupabaseClient:
         load_dotenv()
         self.url = os.getenv("SUPABASE_URL")
         self.key = os.getenv("SUPABASE_ANON_KEY")
+        self.service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
         if not self.url or not self.key:
             raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables")
         
         self.client: Client = create_client(self.url, self.key)
-        print(f"Supabase client created: {self.client.auth.get_user()}")
+        self.admin_client: Optional[Client] = None
+        if self.service_key:
+            try:
+                self.admin_client = create_client(self.url, self.service_key)
+            except Exception:
+                self.admin_client = None
     
     def get_client(self) -> Client:
         return self.client
+    
+    def get_admin_client(self) -> Optional[Client]:
+        return self.admin_client
 
 # Global instance
 _supabase_client: Optional[SupabaseClient] = None
