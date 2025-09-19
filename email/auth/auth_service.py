@@ -7,7 +7,14 @@ from supabase import Client
 
 # Add the parent directory to the path to access provider module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from provider.supabase_client import get_supabase_client
+try:
+    from common.supabase_client import get_supabase_client
+except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common.supabase_client import get_supabase_client
+
 from dotenv import load_dotenv
 
 load_dotenv()

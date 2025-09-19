@@ -8,13 +8,16 @@ import uuid
 from dotenv import load_dotenv
 import uvicorn
 try:
-    from .supabase_client import get_supabase_client
+    from common.supabase_client import get_supabase_client
     from .email_providers import EmailProviderManager
-    from .models import User, EmailAccount, EmailMessage
+    from .models import User, EmailAccount
 except ImportError:
-    from supabase_client import get_supabase_client
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common.supabase_client import get_supabase_client
     from email_providers import EmailProviderManager
-    from models import User, EmailAccount, EmailMessage
+    from models import User, EmailAccount
 
 # Import auth module from parent directory
 import sys
@@ -45,20 +48,7 @@ class EmailAccountResponse(BaseModel):
     is_active: bool
     created_at: str
 
-class SendEmailRequest(BaseModel):
-    to: List[EmailStr]
-    subject: str
-    body: str
-    is_html: bool = False
-
-class EmailMessageResponse(BaseModel):
-    id: str
-    subject: str
-    sender: str
-    recipient: str
-    body: str
-    timestamp: str
-    is_read: bool
+# Email-related models moved to email_service module
 
 @provider_router.get("/")
 async def root():
@@ -116,55 +106,7 @@ async def get_email_accounts(current_user = Depends(get_current_user_from_token)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@provider_router.get("/emails/{account_id}", response_model=List[EmailMessageResponse])
-async def get_emails(
-    account_id: str,
-    limit: int = 50,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Get emails from a specific account"""
-    try:
-        print("1111111111111111111111")
-        emails = await email_manager.get_emails(
-            user_id=current_user.id,
-            account_id=account_id,
-            limit=limit
-        )
-        print("222222222222222222222")
-        return [
-            EmailMessageResponse(
-                id=email['id'],
-                subject=email['subject'],
-                sender=email['sender'],
-                recipient=email['recipient'],
-                body=email['body'],
-                timestamp=email['timestamp'],
-                is_read=email['is_read']
-            )
-            for email in emails
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@provider_router.post("/send-email/{account_id}")
-async def send_email(
-    account_id: str,
-    email_request: SendEmailRequest,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Send email using a specific account"""
-    try:
-        result = await email_manager.send_email(
-            user_id=current_user.id,
-            account_id=account_id,
-            to_emails=email_request.to,
-            subject=email_request.subject,
-            body=email_request.body,
-            is_html=email_request.is_html
-        )
-        return {"message": "Email sent successfully", "message_id": result}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# Email functionality moved to email_service module
 
 @provider_router.get("/auth-url/{provider}")
 async def get_auth_url(provider: str, current_user = Depends(get_current_user_from_token)):

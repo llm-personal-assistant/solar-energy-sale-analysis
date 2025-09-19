@@ -17,9 +17,12 @@ import imaplib
 import smtplib
 
 try:
-    from supabase_client import get_supabase_client
+    from common.supabase_client import get_supabase_client
 except ImportError:
-    from .supabase_client import get_supabase_client
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common.supabase_client import get_supabase_client
 
 
 
@@ -531,9 +534,9 @@ class EmailProviderManager:
                 'timestamp': email['timestamp'],
                 'is_read': email['is_read']
             }
-            email_message = self.admin.schema('email_provider').from_('email_messages').select('*').eq('account_id', account_id).eq('message_id', email['id']).limit(1).execute()
+            email_message = self.admin.schema('email').from_('email_messages').select('*').eq('account_id', account_id).eq('message_id', email['id']).limit(1).execute()
             if not email_message.data:
-                self.admin.schema('email_provider').from_('email_messages').upsert(email_data).execute()
+                self.admin.schema('email').from_('email_messages').upsert(email_data).execute()
             else:
                 print("message already exist {email_message}")
         

@@ -13,10 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import uvicorn
 try:
-    from .email_service.routes import email_router, send_router, draft_router, account_router
+    from .email_service.service_routes import service_router
 except ImportError:
-    from email_service.routes import email_router, send_router, draft_router, account_router
-
+    from email_service.service_routes import service_router
 try:
     from .provider.provider_routes import provider_router
 except ImportError:
@@ -48,10 +47,8 @@ app.add_middleware(
 )
 app.include_router(provider_router)
 app.include_router(auth_router)
-app.include_router(email_router)
-app.include_router(send_router)
-app.include_router(draft_router)
-app.include_router(account_router)  
+app.include_router(service_router)
+
 
 # Import and run the FastAPI app
 if __name__ == "__main__":
