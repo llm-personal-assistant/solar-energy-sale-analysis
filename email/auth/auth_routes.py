@@ -12,7 +12,7 @@ except ImportError:
     from models import UserSignUp, UserSignIn, AuthResponse, UserResponse, TokenResponse
     from auth_service import AuthService
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+auth_router = APIRouter(prefix="/auth", tags=["authentication"])
 security = HTTPBearer()
 
 # Initialize auth service lazily
@@ -24,7 +24,7 @@ def get_auth_service():
         auth_service = AuthService()
     return auth_service
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@auth_router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(user_data: UserSignUp):
     """
     Sign up a new user with email and password
@@ -58,7 +58,7 @@ async def sign_up(user_data: UserSignUp):
             detail="Internal server error"
         )
 
-@router.post("/signin", response_model=AuthResponse)
+@auth_router.post("/signin", response_model=AuthResponse)
 async def sign_in(credentials: UserSignIn):
     """
     Sign in user with email and password
@@ -77,7 +77,7 @@ async def sign_in(credentials: UserSignIn):
             detail="Internal server error"
         )
 
-@router.post("/signout")
+@auth_router.post("/signout")
 async def sign_out():
     """
     Sign out the current user
@@ -97,7 +97,7 @@ async def sign_out():
             detail="Internal server error"
         )
 
-@router.get("/me", response_model=UserResponse)
+@auth_router.get("/me", response_model=UserResponse)
 async def get_current_user():
     """
     Get the current authenticated user
@@ -118,7 +118,7 @@ async def get_current_user():
             detail="Internal server error"
         )
 
-@router.post("/refresh", response_model=TokenResponse)
+@auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(refresh_token: str):
     """
     Refresh the access token using refresh token
@@ -137,7 +137,7 @@ async def refresh_token(refresh_token: str):
             detail="Internal server error"
         )
 
-@router.post("/reset-password")
+@auth_router.post("/reset-password")
 async def reset_password(email: str):
     """
     Send password reset email
@@ -213,17 +213,17 @@ async def get_current_user_from_token(credentials: HTTPAuthorizationCredentials 
 
 
 # Create FastAPI app for standalone running
-app = FastAPI(
+auth_app = FastAPI(
     title="Authentication API",
     description="Authentication service for email provider application",
     version="1.0.0"
 )
 
 # Include the auth router
-app.include_router(router)
+auth_app.include_router(auth_router)
 
 
-@app.get("/health")
+@auth_app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "authentication"}
 
@@ -236,4 +236,4 @@ if __name__ == "__main__":
     print("Email Confirmation at: http://localhost:8001/auth/confirm")
     print("Press Ctrl+C to stop the server")
     print("-" * 50)
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(auth_app, host="0.0.0.0", port=8001)

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
@@ -7,43 +7,29 @@ import os
 import uuid
 from dotenv import load_dotenv
 import uvicorn
-
-from supabase_client import get_supabase_client
-from email_providers import EmailProviderManager
-from models import User, EmailAccount, EmailMessage
+try:
+    from .supabase_client import get_supabase_client
+    from .email_providers import EmailProviderManager
+    from .models import User, EmailAccount, EmailMessage
+except ImportError:
+    from supabase_client import get_supabase_client
+    from email_providers import EmailProviderManager
+    from models import User, EmailAccount, EmailMessage
 
 # Import auth module from parent directory
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from auth.routes import router, get_current_user_from_token
+from auth.auth_routes import get_current_user_from_token
 
+provider_router = APIRouter(prefix="/auth", tags=["provider"])
+security = HTTPBearer()
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(
-    title="Email Provider API",
-    description="API for managing email providers (Google, Outlook, Yahoo) with Supabase",
-    version="1.0.0"
-)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Security
-security = HTTPBearer()
 
 # Initialize email provider manager
 email_manager = EmailProviderManager()
-
-# Include auth router
-app.include_router(router)
 
 # Pydantic models for API
 class UserRegistration(BaseModel):
@@ -74,11 +60,11 @@ class EmailMessageResponse(BaseModel):
     timestamp: str
     is_read: bool
 
-@app.get("/")
+@provider_router.get("/")
 async def root():
     return {"message": "Email Provider API is running"}
 
-@app.post("/register-email-provider", response_model=EmailAccountResponse)
+@provider_router.post("/register-email-provider", response_model=EmailAccountResponse)
 async def register_email_provider(
     registration: UserRegistration,
     current_user = Depends(get_current_user_from_token)
@@ -112,7 +98,7 @@ async def register_email_provider(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/email-accounts", response_model=List[EmailAccountResponse])
+@provider_router.get("/email-accounts", response_model=List[EmailAccountResponse])
 async def get_email_accounts(current_user = Depends(get_current_user_from_token)):
     """Get all email accounts for the current user"""
     try:
@@ -130,7 +116,7 @@ async def get_email_accounts(current_user = Depends(get_current_user_from_token)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/emails/{account_id}", response_model=List[EmailMessageResponse])
+@provider_router.get("/emails/{account_id}", response_model=List[EmailMessageResponse])
 async def get_emails(
     account_id: str,
     limit: int = 50,
@@ -160,7 +146,7 @@ async def get_emails(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/send-email/{account_id}")
+@provider_router.post("/send-email/{account_id}")
 async def send_email(
     account_id: str,
     email_request: SendEmailRequest,
@@ -180,7 +166,7 @@ async def send_email(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/auth-url/{provider}")
+@provider_router.get("/auth-url/{provider}")
 async def get_auth_url(provider: str, current_user = Depends(get_current_user_from_token)):
     """Get OAuth URL for email provider authentication"""
     try:
@@ -196,7 +182,7 @@ async def get_auth_url(provider: str, current_user = Depends(get_current_user_fr
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/oauth-callback/{provider}")
+@provider_router.get("/oauth-callback/{provider}")
 async def oauth_callback(
     provider: str,
     code: str,
@@ -225,5 +211,21 @@ async def oauth_callback(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+provider_app = FastAPI(
+    title="Email Provider API",
+    description="API for managing email providers (Google, Outlook, Yahoo) with Supabase",
+    version="1.0.0"
+)
+
+# CORS middleware
+provider_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure this properly for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+provider_app.include_router(provider_router)
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(provider_app, host="0.0.0.0", port=8000)

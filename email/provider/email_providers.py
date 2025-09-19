@@ -16,7 +16,12 @@ from email.mime.multipart import MIMEMultipart
 import imaplib
 import smtplib
 
-from supabase_client import get_supabase_client
+try:
+    from supabase_client import get_supabase_client
+except ImportError:
+    from .supabase_client import get_supabase_client
+
+
 
 def _parse_email_timestamp(timestamp_str: str) -> str:
     """Parse email timestamp from various formats to ISO 8601"""
