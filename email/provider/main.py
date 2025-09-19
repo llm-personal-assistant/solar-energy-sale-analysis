@@ -206,7 +206,6 @@ async def oauth_callback(
     try:
         # Validate state and get associated user_id
         print(f"Validating state: {state} for provider: {provider}")
-        print(f"Code: {code}")
 
         user_id = await email_manager.validate_and_consume_state(state, provider)
         print(f"User ID: {user_id}")

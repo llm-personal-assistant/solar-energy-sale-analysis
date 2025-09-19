@@ -210,39 +210,6 @@ class GoogleEmailProvider:
         ).execute()
         
         return result['id']
-    async def get_emails_with_credentials(self, credentials, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get emails using pre-configured credentials (for automatic refresh)"""
-        service = build('gmail', 'v1', credentials=credentials)
-        
-        # Get list of messages
-        results = service.users().messages().list(userId='me', maxResults=limit).execute()
-        messages = results.get('messages', [])
-        
-        emails = []
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id']).execute()
-            
-            # Extract headers
-            headers = msg['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            recipient = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown Recipient')
-            date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
-            
-            # Extract body
-            body = self._extract_body(msg['payload'])
-            
-            emails.append({
-                'id': message['id'],
-                'subject': subject,
-                'sender': sender,
-                'recipient': recipient,
-                'body': body,
-                'timestamp': date,
-                'is_read': 'UNREAD' not in msg['labelIds']
-            })
-        
-        return emails
 
 
 class OutlookEmailProvider:
@@ -404,7 +371,7 @@ class EmailProviderManager:
             'outlook': OutlookEmailProvider(),
             'yahoo': YahooEmailProvider()
         }
-        self.supabase = get_supabase_client().get_client()
+        # self.admin = get_supabase_client().get_client()
         self.admin = get_supabase_client().get_admin_client()
         
     
@@ -463,11 +430,11 @@ class EmailProviderManager:
             'is_active': True
         }
         
-        result = self.supabase.schema('email_provider').from_('email_accounts').upsert(account_data, on_conflict="user_id,email,provider").execute()
+        result = self.admin.schema('email_provider').from_('email_accounts').upsert(account_data, on_conflict="user_id,email,provider").execute()
         return result.data[0]
     
     async def get_user_email_accounts(self, user_id: str) -> List[Dict[str, Any]]:
-        result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('user_id', user_id).execute()
+        result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('user_id', user_id).execute()
         return result.data
     
 
@@ -484,7 +451,7 @@ class EmailProviderManager:
                 'updated_at': datetime.now(timezone.utc).isoformat()
             }
             
-            self.supabase.schema('email_provider').from_('email_accounts').update(update_data).eq('id', account_id).execute()
+            self.admin.schema('email_provider').from_('email_accounts').update(update_data).eq('id', account_id).execute()
             print(f"Refreshed tokens for account {account_id}")
             
             return {
@@ -526,7 +493,7 @@ class EmailProviderManager:
 
     async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Get account details
-        account_result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
         print(f"account_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
@@ -569,7 +536,7 @@ class EmailProviderManager:
     
     async def send_email(self, user_id: str, account_id: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
         # Get account details
-        account_result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
         
         if not account_result.data:
             raise ValueError("Account not found")
@@ -603,7 +570,7 @@ class EmailProviderManager:
         }
         print(f"Storing state in database: {state_data}")
         try:    
-            self.supabase.schema('email_provider').from_('oauth_states').insert(state_data).execute()
+            self.admin.schema('email_provider').from_('oauth_states').insert(state_data).execute()
             print(f"State stored in database")
         except Exception as e:
             print(f"Error storing state in database: {e}")
@@ -637,7 +604,7 @@ class EmailProviderManager:
         """Validate the OAuth state and return the associated user_id. Persist verification metadata instead of deleting."""
         print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 00000000000")
         # Find matching state
-        result = self.supabase.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).limit(1).execute()
+        result = self.admin.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).limit(1).execute()
         if not result.data:
             raise ValueError("Invalid OAuth state")
         record = result.data[0]
@@ -658,7 +625,7 @@ class EmailProviderManager:
             raise ValueError("OAuth state is missing user association")
         print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 222222222")
         # Mark as verified instead of deleting
-        self.supabase.schema('email_provider').from_('oauth_states').update({
+        self.admin.schema('email_provider').from_('oauth_states').update({
             'verified': True,
             'verified_at': now_utc.isoformat()
         }).eq('id', record['id']).execute()
