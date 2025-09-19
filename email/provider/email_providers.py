@@ -438,6 +438,8 @@ class EmailProviderManager:
         
         # Exchange code for tokens
         tokens = await self.providers[provider].exchange_code_for_tokens(code)
+        print("tokens tokens tokens tokens tokens" )
+        print(tokens)
         
         # Get user email from provider
         user_email = await self._get_user_email_from_provider(provider, tokens['access_token'])
@@ -461,7 +463,7 @@ class EmailProviderManager:
             'is_active': True
         }
         
-        result = self.supabase.schema('email_provider').from_('email_accounts').insert(account_data).execute()
+        result = self.supabase.schema('email_provider').from_('email_accounts').upsert(account_data, on_conflict="user_id,email,provider").execute()
         return result.data[0]
     
     async def get_user_email_accounts(self, user_id: str) -> List[Dict[str, Any]]:
@@ -493,11 +495,11 @@ class EmailProviderManager:
             print(f"Failed to refresh tokens: {e}")
             raise ValueError(f"Token refresh failed: {e}")
     
-    async def _get_credentials_with_refresh(self, account: Dict[str, Any], provider_name: str) -> Any:
+    async def _get_credentials_with_refresh(self, account: Dict[str, Any]) -> Any:
         """Get credentials with automatic refresh capability"""
-        provider = self.providers[provider_name]
+        provider = self.providers[account['provider']]
         
-        if provider_name == 'google':
+        if account['provider'] == 'google':
             from google.oauth2.credentials import Credentials
             from google.auth.transport.requests import Request
             
@@ -513,14 +515,14 @@ class EmailProviderManager:
             if not credentials.valid:
                 if credentials.expired and credentials.refresh_token:
                     print(f"Token expired for account {account['id']}, refreshing...")
-                    await self._refresh_and_save_tokens(account['id'], provider_name, credentials)
+                    await self._refresh_and_save_tokens(account['id'], account['provider'], credentials)
                 else:
                     raise ValueError("Token expired and no refresh token available")
             
             return credentials
         else:
             # For other providers, return the access token as-is
-            return account['access_token']
+            return None
 
     async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Get account details
@@ -530,8 +532,16 @@ class EmailProviderManager:
             raise ValueError("Account not found")
         
         account = account_result.data[0]
-        provider = self.providers[account['provider']]
+        new_credentials = await self._get_credentials_with_refresh(account)
+        print("new_credentialsnew_credentialsnew_credentialsnew_credentialsnew_credentials")
+        print(account)
+        if new_credentials:
+            account['access_token'] = new_credentials.token
+            account['refresh_token'] = new_credentials.refresh_token
+        print("accountaccountaccountaccountaccountaccount")
+        print(account)
         
+        provider = self.providers[account['provider']]
         # Get emails from provider
         print(f"account['access_token'] :{account['access_token']}")
         emails = await provider.get_emails(account['access_token'], limit, account.get('refresh_token'))
@@ -549,20 +559,27 @@ class EmailProviderManager:
                 'timestamp': email['timestamp'],
                 'is_read': email['is_read']
             }
-            print(email_data)
-            self.admin.schema('email_provider').from_('email_messages').upsert(email_data).execute()
+            email_message = self.admin.schema('email_provider').from_('email_messages').select('*').eq('account_id', account_id).eq('message_id', email['id']).limit(1).execute()
+            if not email_message.data:
+                self.admin.schema('email_provider').from_('email_messages').upsert(email_data).execute()
+            else:
+                print("message already exist {email_message}")
         
         return emails
     
     async def send_email(self, user_id: str, account_id: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
         # Get account details
-        account_result = self.supabase.schema('email_provider').from_('email_provider.email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.supabase.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
         
         if not account_result.data:
             raise ValueError("Account not found")
         
         account = account_result.data[0]
         provider = self.providers[account['provider']]
+        new_credentials = await self._get_credentials_with_refresh(account)
+        if new_credentials:
+            account['access_token'] = new_credentials.token
+            account['refresh_token'] = new_credentials.refresh_token
         
         # Send email via provider
         message_id = await provider.send_email(
@@ -618,12 +635,13 @@ class EmailProviderManager:
     
     async def validate_and_consume_state(self, state: str, provider: str) -> str:
         """Validate the OAuth state and return the associated user_id. Persist verification metadata instead of deleting."""
+        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 00000000000")
         # Find matching state
         result = self.supabase.schema('email_provider').from_('oauth_states').select('*').eq('state', state).eq('provider', provider).limit(1).execute()
         if not result.data:
             raise ValueError("Invalid OAuth state")
         record = result.data[0]
-        # Check expiry
+        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 111111111111")# Check expiry
         try:
             expires_at = datetime.fromisoformat(record['expires_at'])
             if expires_at.tzinfo is None:
@@ -638,9 +656,11 @@ class EmailProviderManager:
         user_id = record.get('user_id')
         if not user_id:
             raise ValueError("OAuth state is missing user association")
+        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 222222222")
         # Mark as verified instead of deleting
         self.supabase.schema('email_provider').from_('oauth_states').update({
             'verified': True,
             'verified_at': now_utc.isoformat()
         }).eq('id', record['id']).execute()
+        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 3333333333")
         return user_id
