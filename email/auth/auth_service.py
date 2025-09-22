@@ -161,7 +161,6 @@ class AuthService:
         """
         try:
             user = self.supabase.auth.get_user(jwt=jwt)
-            print(f"useruseruseruseruser {user}")
             if user.user is None:
                 return None
             return self._build_user_response(user.user)
