@@ -140,3 +140,4 @@ EXISTS (
 - RLS policies ensure data security across schemas
 - All indexes and triggers are properly updated
 - The schema separation provides better organization and maintainability
+

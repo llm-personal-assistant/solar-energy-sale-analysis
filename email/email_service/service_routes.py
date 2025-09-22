@@ -71,6 +71,7 @@ async def get_emails(
 ):
     """Get emails from a specific account"""
     try:
+        print(f"current_usercurrent_usercurrent_usercurrent_usercurrent_user {current_user}")
         emails = await email_service.get_emails(
             user_id=current_user.id,
             account_id=account_id,

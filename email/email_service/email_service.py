@@ -56,17 +56,22 @@ def _parse_email_timestamp(timestamp_str: str) -> str:
 
 class GoogleEmailService:
     def __init__(self):
-        self.client_id = os.getenv("GOOGLE_CLIENT_ID")
+        self.client_id = os.getenv("GOOGLE_CLIENT_ID") 
         self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     
     async def get_emails(self, access_token: str, limit: int = 50, refresh_token: str = None) -> List[Dict[str, Any]]:
+        print(f"access_tokenaccess_tokenaccess_tokenaccess_tokenaccess_token {access_token}")
+        print(f"refresh_tokenrefresh_tokenrefresh_tokenrefresh_tokenrefresh_token {refresh_token}") 
+        print(f"client_idclient_idclient_idclient_idclient_id {os.getenv("GOOGLE_CLIENT_ID")}")
+        print(f"client_secretclient_secretclient_secretclient_secretclient_secret {os.getenv("GOOGLE_CLIENT_SECRET")}")    
         credentials = Credentials(
             token=access_token,
             refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=self.client_id,
-            client_secret=self.client_secret
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
         )
+
         service = build('gmail', 'v1', credentials=credentials)
         
         # Get list of messages
@@ -230,8 +235,10 @@ class EmailService:
         """Refresh tokens and save to database"""
         try:
             # Refresh the credentials
+            print(f"credentialscredentialscredentialscredentialscredentials {credentials}")
             credentials.refresh(Request())
-            
+            print(f"access_tokenaccess_tokenaccess_tokenaccess_tokenaccess_token {credentials.token}")
+            print(f"refresh_tokenrefresh_tokenrefresh_tokenrefresh_tokenrefresh_token {credentials.refresh_token}")
             # Update the account with new tokens
             update_data = {
                 'access_token': credentials.token,
@@ -252,6 +259,7 @@ class EmailService:
     
     async def _get_credentials_with_refresh(self, account: Dict[str, Any]) -> Any:
         """Get credentials with automatic refresh capability"""
+        print(f"accountaccountaccountaccountaccount {account}")
         if account['provider'] == 'google':
             credentials = Credentials(
                 token=account['access_token'],
@@ -260,7 +268,15 @@ class EmailService:
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
             )
-            
+            print("client_idclient_idclient_idclient_idclient_id")
+            print(os.getenv("GOOGLE_CLIENT_ID"))
+            print("client_secretclient_secretclient_secretclient_secretclient_secret")
+            print(os.getenv("GOOGLE_CLIENT_SECRET"))
+
+            print("credentialscredentialscredentialscredentialscredentials")
+            print(credentials.valid)
+            print(credentials.expired)
+            print(credentials.refresh_token)
             # Check if token is expired and refresh if needed
             if not credentials.valid:
                 if credentials.expired and credentials.refresh_token:
@@ -276,8 +292,9 @@ class EmailService:
 
     async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         # Get account details
+        print(f"user_iduser_iduser_iduser_iduser_id {user_id}")
         account_result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
-        
+        print(f"account_resultaccount_resultaccount_resultaccount_resultaccount_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
         
@@ -285,6 +302,8 @@ class EmailService:
         new_credentials = await self._get_credentials_with_refresh(account)
         
         if new_credentials:
+            print(f"new_credentialsnew_credentialsnew_credentialsnew_credentialsnew_credentials {new_credentials.token}")
+            print(f"new_credentialsnew_credentialsnew_credentialsnew_credentialsnew_credentials {new_credentials.refresh_token}")
             account['access_token'] = new_credentials.token
             account['refresh_token'] = new_credentials.refresh_token
         

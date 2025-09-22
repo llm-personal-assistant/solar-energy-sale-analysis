@@ -105,3 +105,4 @@ This will verify:
 5. Start the service: `python service_routes.py`
 
 The email service is now focused, lightweight, and ready for production use!
+

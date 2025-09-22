@@ -67,7 +67,7 @@ class GoogleEmailProvider:
     def __init__(self):
         self.client_id = os.getenv("GOOGLE_CLIENT_ID")
         self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-        self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/oauth-callback/google")
+        self.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/oauth-callback/google")
         # Allow insecure transport for local development with http redirect URIs
         if self.redirect_uri.startswith("http://"):
             os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
@@ -224,7 +224,7 @@ class OutlookEmailProvider:
     def __init__(self):
         self.client_id = os.getenv("OUTLOOK_CLIENT_ID")
         self.client_secret = os.getenv("OUTLOOK_CLIENT_SECRET")
-        self.redirect_uri = os.getenv("OUTLOOK_REDIRECT_URI", "http://localhost:8000/oauth-callback/outlook")
+        self.redirect_uri = os.getenv("OUTLOOK_REDIRECT_URI", "http://localhost:8000/auth/oauth-callback/outlook")
         self.authority = "https://login.microsoftonline.com/common"
         self.scopes = ["https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/Mail.Send"]
     
@@ -318,7 +318,7 @@ class YahooEmailProvider:
     def __init__(self):
         self.client_id = os.getenv("YAHOO_CLIENT_ID")
         self.client_secret = os.getenv("YAHOO_CLIENT_SECRET")
-        self.redirect_uri = os.getenv("YAHOO_REDIRECT_URI", "http://localhost:8000/oauth-callback/yahoo")
+        self.redirect_uri = os.getenv("YAHOO_REDIRECT_URI", "http://localhost:8000/auth/oauth-callback/yahoo")
         self.scopes = ["mail-r", "mail-w"]
     
     def get_auth_url(self, state: str) -> str:
