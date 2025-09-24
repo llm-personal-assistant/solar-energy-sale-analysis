@@ -134,6 +134,8 @@ class AuthService:
         Sign in user with email and password
         """
         try:
+            print("email", credentials.email)
+            print("password", credentials.password)
             auth_response = self.supabase.auth.sign_in_with_password({
                 "email": credentials.email,
                 "password": credentials.password

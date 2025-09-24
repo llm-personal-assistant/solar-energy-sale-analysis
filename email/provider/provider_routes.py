@@ -7,6 +7,7 @@ import os
 import uuid
 from dotenv import load_dotenv
 import uvicorn
+
 try:
     from common.supabase_client import get_supabase_client
     from .email_providers import EmailProviderManager

@@ -14,18 +14,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import uvicorn
 try:
     from .email_service.service_routes import service_router
-except ImportError:
-    from email_service.service_routes import service_router
-try:
     from .provider.provider_routes import provider_router
-except ImportError:
-    from provider.provider_routes import provider_router
-
-try:
     from .auth.auth_routes import auth_router
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from email_service.service_routes import service_router
+    from provider.provider_routes import provider_router
     from auth.auth_routes import auth_router
-
 # Add the current directory to Python path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))

@@ -243,18 +243,19 @@ class OutlookEmailProvider:
         return auth_url
     
     async def exchange_code_for_tokens(self, code: str) -> Dict[str, str]:
+        print(f"Exchanging code for tokens: {code}")
         app = ConfidentialClientApplication(
             self.client_id,
             authority=self.authority,
             client_credential=self.client_secret
         )
-        
+        print(f"App: {app}")
         result = app.acquire_token_by_authorization_code(
             code,
             scopes=self.scopes,
             redirect_uri=self.redirect_uri
         )
-        
+        print(f"Result: {result}")
         return {
             "access_token": result["access_token"],
             "refresh_token": result.get("refresh_token", "")
