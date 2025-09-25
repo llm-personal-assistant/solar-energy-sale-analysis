@@ -9,12 +9,21 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
-
-from .models import EmailSyncRequest, EmailSyncResult, EmailMessage, EmailAccount
-from .email_sync_service import EmailSyncService
-from .gmail_service import GmailService
-from .outlook_service import OutlookService
-from common.supabase_client import get_supabase_client
+try: 
+    from .models import EmailSyncRequest, EmailSyncResult, EmailMessage, EmailAccount
+    from .email_sync_service import EmailSyncService
+    from .gmail_service import GmailService
+    from .outlook_service import OutlookService
+    from common.supabase_client import get_supabase_client
+except Exception as e:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models import EmailSyncRequest, EmailSyncResult, EmailMessage, EmailAccount
+    from email_sync_service import EmailSyncService
+    from gmail_service import GmailService
+    from outlook_service import OutlookService
+    from common.supabase_client import get_supabase_client
 
 # Import auth dependencies
 import sys
@@ -26,10 +35,10 @@ from auth.models import UserResponse
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/data-sync", tags=["Email Data Sync"])
+data_sync_router = APIRouter(prefix="/data-sync", tags=["Email Data Sync"])
 
 # Initialize services
-supabase = get_supabase_client()
+supabase = get_supabase_client().get_admin_client()
 email_sync_service = EmailSyncService(supabase)
 gmail_service = GmailService()
 outlook_service = OutlookService()
@@ -37,8 +46,6 @@ outlook_service = OutlookService()
 
 class SyncEmailsRequest(BaseModel):
     """Request model for syncing emails."""
-    account_id: Optional[str] = Field(None, description="Specific account ID to sync")
-    provider: Optional[str] = Field(None, description="Provider to sync (google, outlook)")
     max_messages: int = Field(100, ge=1, le=1000, description="Maximum number of messages to sync")
     folder: Optional[str] = Field(None, description="Specific folder to sync (inbox, sent, etc.)")
     background_sync: bool = Field(False, description="Whether to run sync in background")
@@ -84,7 +91,7 @@ class MessagesResponse(BaseModel):
     limit: int
 
 
-@router.get("/accounts", response_model=UserAccountsResponse)
+@data_sync_router.get("/active/check", response_model=UserAccountsResponse)
 async def get_user_email_accounts(
     current_user: UserResponse = Depends(get_current_user_from_token),
     active_only: bool = Query(True, description="Only return active accounts")
@@ -123,7 +130,7 @@ async def get_user_email_accounts(
         raise HTTPException(status_code=500, detail=f"Failed to get email accounts: {str(e)}")
 
 
-@router.post("/sync", response_model=SyncEmailsResponse)
+@data_sync_router.post("/sync", response_model=SyncEmailsResponse)
 async def sync_emails(
     request: SyncEmailsRequest,
     background_tasks: BackgroundTasks,
@@ -134,8 +141,6 @@ async def sync_emails(
         # Create sync request
         sync_request = EmailSyncRequest(
             user_id=current_user.id,
-            account_id=request.account_id,
-            provider=request.provider,
             max_messages=request.max_messages,
             folder=request.folder
         )
@@ -173,7 +178,7 @@ async def sync_emails(
         raise HTTPException(status_code=500, detail=f"Failed to sync emails: {str(e)}")
 
 
-@router.post("/sync/account/{account_id}", response_model=SyncEmailsResponse)
+@data_sync_router.post("/sync/account/{account_id}", response_model=SyncEmailsResponse)
 async def sync_account_emails(
     account_id: str,
     current_user: UserResponse = Depends(get_current_user_from_token),
@@ -249,7 +254,7 @@ async def sync_account_emails(
         raise HTTPException(status_code=500, detail=f"Failed to sync account emails: {str(e)}")
 
 
-@router.get("/status", response_model=SyncStatusResponse)
+@data_sync_router.get("/status", response_model=SyncStatusResponse)
 async def get_sync_status(
     current_user: UserResponse = Depends(get_current_user_from_token)
 ):
@@ -269,7 +274,7 @@ async def get_sync_status(
         raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
 
 
-@router.get("/messages", response_model=MessagesResponse)
+@data_sync_router.get("/messages", response_model=MessagesResponse)
 async def get_user_messages(
     current_user: UserResponse = Depends(get_current_user_from_token),
     limit: int = Query(50, ge=1, le=500, description="Number of messages to return"),
@@ -280,7 +285,7 @@ async def get_user_messages(
     """Get messages for a user."""
     try:
         # Build query
-        query = supabase.table("email_message")\
+        query = supabase.schema("email_provider").from_("email_message")\
             .select("*")\
             .eq("user_id", current_user.id)\
             .order("created_at", desc=True)\
@@ -317,7 +322,7 @@ async def get_user_messages(
             messages.append(message)
         
         # Get total count
-        count_query = supabase.table("email_message")\
+        count_query = supabase.schema("email_provider").from_("email_message")\
             .select("message_id", count="exact")\
             .eq("user_id", current_user.id)
         
@@ -342,7 +347,7 @@ async def get_user_messages(
         raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
 
 
-@router.patch("/messages/{message_id}/read")
+@data_sync_router.patch("/messages/{message_id}/read")
 async def mark_message_as_read(
     message_id: str,
     current_user: UserResponse = Depends(get_current_user_from_token)
@@ -363,7 +368,7 @@ async def mark_message_as_read(
         raise HTTPException(status_code=500, detail=f"Failed to mark message as read: {str(e)}")
 
 
-@router.get("/folders/{provider}")
+@data_sync_router.get("/folders/{provider}")
 async def get_provider_folders(
     provider: str,
     current_user: UserResponse = Depends(get_current_user_from_token),
@@ -436,7 +441,7 @@ async def _background_sync_account(account: EmailAccount, user_id: str, max_mess
 
 
 # Health check endpoint
-@router.get("/health")
+@data_sync_router.get("/health")
 async def health_check(current_user: UserResponse = Depends(get_current_user_from_token)):
     """Health check endpoint."""
     return {"status": "healthy", "service": "email-data-sync", "user_id": current_user.id}

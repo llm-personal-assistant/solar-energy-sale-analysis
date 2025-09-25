@@ -229,8 +229,6 @@ class EmailAccount(BaseModel):
 class EmailSyncRequest(BaseModel):
     """Request model for email synchronization."""
     user_id: str = Field(..., description="User ID for the sync operation")
-    account_id: Optional[str] = Field(None, description="Specific account ID to sync")
-    provider: Optional[str] = Field(None, description="Provider to sync (google, outlook)")
     max_messages: int = Field(100, description="Maximum number of messages to sync")
     folder: Optional[str] = Field(None, description="Specific folder to sync")
 

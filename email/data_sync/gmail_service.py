@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import re
+import os
+from dotenv import load_dotenv
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -24,11 +26,10 @@ logger = logging.getLogger(__name__)
 
 # Gmail API scopes
 SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.modify'
+    'https://www.googleapis.com/auth/gmail.readonly'
 ]
 
-
+load_dotenv()
 class GmailService:
     """Service for interacting with Gmail API."""
     
@@ -44,8 +45,8 @@ class GmailService:
                 token=access_token,
                 refresh_token=refresh_token,
                 token_uri="https://oauth2.googleapis.com/token",
-                client_id=None,  # Will be set from token
-                client_secret=None,  # Will be set from token
+                client_id=os.getenv("GOOGLE_CLIENT_ID"),  # Will be set from token
+                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),  # Will be set from token
                 scopes=SCOPES
             )
             
@@ -94,6 +95,7 @@ class GmailService:
             gmail_query = query
             if folder_id and folder_id != 'ALL':
                 gmail_query = f"in:{folder_id} {query}".strip()
+            print(f"gmail_query gmail_query gmail_query {gmail_query}")
             
             # Get message list
             results = self.service.users().messages().list(
@@ -102,7 +104,7 @@ class GmailService:
                 maxResults=max_results,
                 includeSpamTrash=include_spam_trash
             ).execute()
-            
+            print(f"results results results {len(results)}")
             messages = results.get('messages', [])
             detailed_messages = []
             
@@ -256,12 +258,13 @@ class GmailService:
             # Authenticate
             if not self.authenticate_with_tokens(account.access_token, account.refresh_token):
                 raise Exception("Failed to authenticate with Gmail")
-            
+            print(f"get_messages get_messages get_messages  folder {folder}, max_messages {max_messages}")
             # Get messages
             messages = self.get_messages(
                 folder_id=folder or 'INBOX',
                 max_results=max_messages
             )
+            print(f"get_messages get_messages get_messages {len(messages)}")
             
             # Convert to EmailMessageCreate objects
             email_messages = []

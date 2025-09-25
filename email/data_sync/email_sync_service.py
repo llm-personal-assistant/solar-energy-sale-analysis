@@ -7,14 +7,25 @@ import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from supabase import Client
-
-from .models import (
-    EmailMessage, EmailMessageCreate, EmailMessageUpdate,
-    EmailAccount, EmailSyncRequest, EmailSyncResult, DataSyncResponse
-)
-from .gmail_service import GmailService
-from .outlook_service import OutlookService
-
+try:
+    from .models import (
+        EmailMessage, EmailMessageCreate, EmailMessageUpdate,
+        EmailAccount, EmailSyncRequest, EmailSyncResult, DataSyncResponse
+    )
+    from .gmail_service import GmailService
+    from .outlook_service import OutlookService
+    from common.supabase_client import get_supabase_client
+except Exception as e:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models import (
+        EmailMessage, EmailMessageCreate, EmailMessageUpdate,
+        EmailAccount, EmailSyncRequest, EmailSyncResult, DataSyncResponse
+    )
+    from gmail_service import GmailService
+    from outlook_service import OutlookService
+    from common.supabase_client import get_supabase_client
 logger = logging.getLogger(__name__)
 
 
@@ -26,12 +37,14 @@ class EmailSyncService:
         self.supabase = supabase_client
         self.gmail_service = GmailService()
         self.outlook_service = OutlookService()
+        self.schema = "email_provider"
         self.message_table = "email_message"
+        self.account_table = "email_accounts"
     
     async def get_user_email_accounts(self, user_id: str) -> List[EmailAccount]:
         """Get all email accounts for a user."""
         try:
-            result = self.supabase.table("email_account")\
+            result = self.supabase.schema(self.schema).from_(self.account_table)\
                 .select("*")\
                 .eq("user_id", user_id)\
                 .eq("is_active", True)\
@@ -63,7 +76,7 @@ class EmailSyncService:
         try:
             # Get user's email accounts
             accounts = await self.get_user_email_accounts(sync_request.user_id)
-            
+            print(f"accountsaccountsaccountsaccountsaccounts {accounts}")
             if not accounts:
                 return EmailSyncResult(
                     success=False,
@@ -72,10 +85,10 @@ class EmailSyncService:
                 )
             
             # Filter accounts if specific criteria provided
-            if sync_request.account_id:
-                accounts = [acc for acc in accounts if acc.id == sync_request.account_id]
-            elif sync_request.provider:
-                accounts = [acc for acc in accounts if acc.provider == sync_request.provider]
+            # if sync_request.account_id:
+            #     accounts = [acc for acc in accounts if acc.id == sync_request.account_id]
+            # elif sync_request.provider:
+            #     accounts = [acc for acc in accounts if acc.provider == sync_request.provider]
             
             total_messages_synced = 0
             total_messages_created = 0
@@ -121,6 +134,7 @@ class EmailSyncService:
     async def sync_emails_for_account(self, account: EmailAccount, user_id: str, 
                                     max_messages: int = 100, folder: Optional[str] = None) -> EmailSyncResult:
         """Sync emails for a specific account."""
+        print(f"accountaccountaccountaccountaccount {account}")
         try:
             # Get emails from provider
             if account.provider.lower() == 'google':
@@ -144,7 +158,8 @@ class EmailSyncService:
                     messages_synced=0,
                     errors=[]
                 )
-            
+            print(f"email_messagesemail_messagesemail_messagesemail_messagesemail_messages {len(email_messages)}")
+            print(f"email_messagesemail_messagesemail_messagesemail_messagesemail_messages {email_messages[0]}")
             # Sync to database
             return await self._sync_messages_to_database(email_messages, user_id)
             
@@ -223,7 +238,7 @@ class EmailSyncService:
     async def _get_message_by_id(self, message_id: str, user_id: str) -> Optional[EmailMessage]:
         """Get a message by ID."""
         try:
-            result = self.supabase.table(self.message_table)\
+            result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("*")\
                 .eq("message_id", message_id)\
                 .eq("user_id", user_id)\
@@ -247,7 +262,7 @@ class EmailSyncService:
             message_dict["updated_at"] = datetime.utcnow().isoformat()
             
             # Insert into Supabase
-            result = self.supabase.table(self.message_table).insert(message_dict).execute()
+            result = self.supabase.schema(self.schema).from_(self.message_table).insert(message_dict).execute()
             
             if result.data:
                 return DataSyncResponse(
@@ -279,7 +294,7 @@ class EmailSyncService:
             update_dict["updated_at"] = datetime.utcnow().isoformat()
             
             # Update in Supabase
-            result = self.supabase.table(self.message_table)\
+            result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .update(update_dict)\
                 .eq("message_id", message_id)\
                 .eq("user_id", user_id)\
@@ -310,7 +325,7 @@ class EmailSyncService:
                                folder: Optional[str] = None) -> List[EmailMessage]:
         """Get messages for a user."""
         try:
-            query = self.supabase.table(self.message_table)\
+            query = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("*")\
                 .eq("user_id", user_id)\
                 .order("created_at", desc=True)\
@@ -330,7 +345,7 @@ class EmailSyncService:
     async def get_unread_count(self, user_id: str, folder: Optional[str] = None) -> int:
         """Get unread message count for a user."""
         try:
-            query = self.supabase.table(self.message_table)\
+            query = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("message_id", count="exact")\
                 .eq("user_id", user_id)\
                 .eq("is_read", False)
@@ -348,7 +363,7 @@ class EmailSyncService:
     async def mark_message_as_read(self, message_id: str, user_id: str) -> DataSyncResponse:
         """Mark a message as read."""
         try:
-            result = self.supabase.table(self.message_table)\
+            result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .update({"is_read": True, "updated_at": datetime.utcnow().isoformat()})\
                 .eq("message_id", message_id)\
                 .eq("user_id", user_id)\
@@ -377,20 +392,20 @@ class EmailSyncService:
         """Get sync status for a user."""
         try:
             # Get total message count
-            total_result = self.supabase.table(self.message_table)\
+            total_result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("message_id", count="exact")\
                 .eq("user_id", user_id)\
                 .execute()
             
             # Get unread count
-            unread_result = self.supabase.table(self.message_table)\
+            unread_result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("message_id", count="exact")\
                 .eq("user_id", user_id)\
                 .eq("is_read", False)\
                 .execute()
             
             # Get messages by folder
-            folder_result = self.supabase.table(self.message_table)\
+            folder_result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("folder")\
                 .eq("user_id", user_id)\
                 .execute()
@@ -401,7 +416,7 @@ class EmailSyncService:
                 folder_counts[folder] = folder_counts.get(folder, 0) + 1
             
             # Get latest sync time
-            latest_result = self.supabase.table(self.message_table)\
+            latest_result = self.supabase.schema(self.schema).from_(self.message_table)\
                 .select("created_at")\
                 .eq("user_id", user_id)\
                 .order("created_at", desc=True)\
