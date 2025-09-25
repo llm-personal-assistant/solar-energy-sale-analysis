@@ -226,7 +226,7 @@ class OutlookEmailProvider:
         self.client_secret = os.getenv("OUTLOOK_CLIENT_SECRET")
         self.redirect_uri = os.getenv("OUTLOOK_REDIRECT_URI", "http://localhost:8000/auth/oauth-callback/outlook")
         self.authority = "https://login.microsoftonline.com/common"
-        self.scopes = ["https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/Mail.Send"]
+        self.scopes = ["https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/Mail.Send", "https://graph.microsoft.com/User.Read"]
     
     def get_auth_url(self, state: str) -> str:
         app = ConfidentialClientApplication(
@@ -244,10 +244,14 @@ class OutlookEmailProvider:
     
     async def exchange_code_for_tokens(self, code: str) -> Dict[str, str]:
         print(f"Exchanging code for tokens: {code}")
+        print(f"Client ID: {self.client_id}")
+        print(f"Client Secret: {self.client_secret}")
+        print(f"Redirect URI: {self.redirect_uri}")
+        print(f"Scopes: {self.scopes}") 
         app = ConfidentialClientApplication(
             self.client_id,
             authority=self.authority,
-            client_credential=self.client_secret
+            client_credential="kE18Q~XqHO_OMyRcSl6Wqd5tcT4y6c59ftHMjctx"#self.client_secret
         )
         print(f"App: {app}")
         result = app.acquire_token_by_authorization_code(
@@ -617,7 +621,7 @@ class EmailProviderManager:
         if not result.data:
             raise ValueError("Invalid OAuth state")
         record = result.data[0]
-        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 111111111111")# Check expiry
+        print("validate_and_consume_statevalidate_and_consume_statevalidate_and_consume_state 1111111")# Check expiry
         try:
             expires_at = datetime.fromisoformat(record['expires_at'])
             if expires_at.tzinfo is None:
