@@ -35,10 +35,11 @@ class AuthService:
             self.admin = None
     
     def _build_user_response(self, user) -> UserResponse:
+     
         return UserResponse(
             id=user.id,
             email=user.email,
-            full_name=user.user_metadata.get('full_name') if getattr(user, 'user_metadata', None) else None,
+            full_name=user.user_metadata.get("full_name"),
             created_at=user.created_at,
             updated_at=user.updated_at
         )
@@ -72,17 +73,41 @@ class AuthService:
             print(f"Resend confirmation failed: {e}")
     
     def _get_user_by_email(self, email: str):
+        """通过 email 获取用户信息 - 修复版本"""
         url = f"{os.getenv('SUPABASE_URL')}/auth/v1/admin/users"
         service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         headers = {
-        "apikey": service_key,  
-        "Authorization": f"Bearer {service_key}"
-         }
-        resp = requests.get(url, headers=headers, params={"email": email})
+            "apikey": service_key,  
+            "Authorization": f"Bearer {service_key}"
+        }
+        # resp = self.admin.auth.
+        # print(f"resp resp resp {resp}")
+        # return resp
+        
+        print(f"Searching for user with email: {email}")
+        
+        # 获取所有用户（Supabase Admin API 不支持 email 过滤）
+        params = {"email": email}
+        url=url+"?email="+email
+        resp = requests.get(url, headers=headers, params=params)
+        print(f"API Response Status: {resp.json()}")
+        
         if resp.status_code == 200:
             data = resp.json()
-            return data.get("users", [])[0] if data.get("users") else None
+            users = data.get("users", [])
+            print(f"Total users found: {len(users)}")
+            
+            # 在客户端过滤匹配 email 的用户
+            matching_users = [user for user in users if user.get("email") == email]
+            
+            if matching_users:
+                print(f"Found matching user: {matching_users[0]['email']}")
+                return matching_users[0]
+            else:
+                print(f"No user found with email: {email}")
+                return None
         else:
+            raise Exception(f"Admin API failed: {resp.text}")
             raise Exception(f"Admin API failed: {resp.text}")
         
     async def sign_up(self, user_data: UserSignUp) -> AuthResponse:
@@ -90,12 +115,14 @@ class AuthService:
         Sign up a new user with email and password
         """
         try:
-            # Pre-check existence via admin (if available)
-            user = self._get_user_by_email(user_data.email)
-            if user:
-                # If exists, try sign-in; else resend confirmation and inform client
-                return self._build_user_response
-            
+            # # Pre-check existence via admin (if available)
+            # user = self._get_user_by_email(user_data.email)
+            # print(f"user user user {user}")
+            # if user:
+            #     # If exists, try sign-in; else resend confirmation and inform client
+            #     user_response = self._build_user_response(user)
+            #     return AuthResponse(user=user_response, access_token="", refresh_token="")
+            # print(f"user_data user_data user_data {user_data}")
             # Proceed with signup
             auth_response = self.supabase.auth.sign_up({
                 "email": user_data.email,
@@ -106,6 +133,7 @@ class AuthService:
                     }
                 }
             })
+            # print(f"auth_response auth_response auth_response {auth_response}")
             if auth_response.user is None:
                 raise ValueError("Failed to create user account")
             

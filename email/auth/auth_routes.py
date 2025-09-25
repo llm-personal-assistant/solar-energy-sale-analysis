@@ -32,7 +32,7 @@ async def sign_up(user_data: UserSignUp):
     try:
         print(f"Signing up user: {user_data}")
         result = await get_auth_service().sign_up(user_data)
-        print(f"Signed up user: {result}")
+        print(f"Signed up user: {result.access_token}")
         
         # Check if email confirmation is required
         if not result.access_token:

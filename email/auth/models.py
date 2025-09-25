@@ -15,8 +15,8 @@ class UserResponse(BaseModel):
     id: str
     email: str
     full_name: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 class AuthResponse(BaseModel):
     user: UserResponse
