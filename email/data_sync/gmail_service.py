@@ -264,15 +264,13 @@ class GmailService:
                 folder_id=folder or 'INBOX',
                 max_results=max_messages
             )
-            print(f"get_messages get_messages get_messages {len(messages)}")
-            
             # Convert to EmailMessageCreate objects
             email_messages = []
             for msg in messages:
                 try:
                     email_msg = EmailMessageCreate(
                         message_id=msg['message_id'],
-                        lead_id=None,  # Will be set later if needed
+                        lead_id=msg.get('threadId', ''),  # Will be set later if needed
                         owner=account.email,
                         sender=msg['sender'],
                         receiver=msg['receiver'],
@@ -281,7 +279,7 @@ class GmailService:
                         is_read=msg['is_read'],
                         folder=msg['folder'],
                         raw_data=msg['raw_data'],
-                        summary=None,  # Will be generated later
+                        summary=msg.get('snippet', ''), # Will be generated later
                         internal_date=msg['internal_date'],
                         history_id=msg.get('history_id')
                     )

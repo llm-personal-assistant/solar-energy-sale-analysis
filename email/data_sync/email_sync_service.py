@@ -34,17 +34,17 @@ class EmailSyncService:
     
     def __init__(self, supabase_client: Client):
         """Initialize the email sync service."""
-        self.supabase = supabase_client
+        self.supabase = get_supabase_client().get_admin_client()
         self.gmail_service = GmailService()
         self.outlook_service = OutlookService()
-        self.schema = "email_provider"
+        self.schema = "email"
         self.message_table = "email_message"
         self.account_table = "email_accounts"
     
     async def get_user_email_accounts(self, user_id: str) -> List[EmailAccount]:
         """Get all email accounts for a user."""
         try:
-            result = self.supabase.schema(self.schema).from_(self.account_table)\
+            result = self.supabase.schema("email_provider").from_(self.account_table)\
                 .select("*")\
                 .eq("user_id", user_id)\
                 .eq("is_active", True)\
@@ -158,8 +158,6 @@ class EmailSyncService:
                     messages_synced=0,
                     errors=[]
                 )
-            print(f"email_messagesemail_messagesemail_messagesemail_messagesemail_messages {len(email_messages)}")
-            print(f"email_messagesemail_messagesemail_messagesemail_messagesemail_messages {email_messages[0]}")
             # Sync to database
             return await self._sync_messages_to_database(email_messages, user_id)
             
