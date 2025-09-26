@@ -161,7 +161,7 @@ class GmailService:
             
             # Check if read
             is_read = 'UNREAD' not in labels
-            
+            print(f"message.get('threadId'),message.get('threadId'),message.get('threadId'), {message.get('threadId')}")
             return {
                 'message_id': message_id,
                 'subject': subject,
@@ -173,7 +173,8 @@ class GmailService:
                 'internal_date': internal_date,
                 'raw_data': message,
                 'labels': labels,
-                'thread_id': message.get('threadId'),
+                'lead_id': message.get('threadId'),
+                'summary': message.get('snippet'),
                 'history_id': message.get('historyId')
             }
             
@@ -268,9 +269,11 @@ class GmailService:
             email_messages = []
             for msg in messages:
                 try:
+                    print(f"lead_id lead_id lead_id lead_id lead_id {msg.get('lead_id', '')}")
+                    print(f"snippet snippet snippet snippet snippet {msg.get('summary', '')}")
                     email_msg = EmailMessageCreate(
                         message_id=msg['message_id'],
-                        lead_id=msg.get('threadId', ''),  # Will be set later if needed
+                        lead_id=msg.get('lead_id', ''),  # Will be set later if needed
                         owner=account.email,
                         sender=msg['sender'],
                         receiver=msg['receiver'],
@@ -279,7 +282,7 @@ class GmailService:
                         is_read=msg['is_read'],
                         folder=msg['folder'],
                         raw_data=msg['raw_data'],
-                        summary=msg.get('snippet', ''), # Will be generated later
+                        summary=msg.get('summary', ''), # Will be generated later
                         internal_date=msg['internal_date'],
                         history_id=msg.get('history_id')
                     )
