@@ -252,7 +252,7 @@ class GmailService:
         
         return 'inbox'  # Default
     
-    def sync_emails_to_database(self, account: EmailAccount, user_id: str, 
+    def get_emails_messages(self, account: EmailAccount, user_id: str, 
                                max_messages: int = 100, folder: Optional[str] = None) -> List[EmailMessageCreate]:
         """Sync Gmail emails to database format."""
         try:

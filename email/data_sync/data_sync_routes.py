@@ -368,55 +368,55 @@ async def mark_message_as_read(
         raise HTTPException(status_code=500, detail=f"Failed to mark message as read: {str(e)}")
 
 
-@data_sync_router.get("/folders/{provider}")
-async def get_provider_folders(
-    provider: str,
-    current_user: UserResponse = Depends(get_current_user_from_token),
-    account_id: Optional[str] = Query(None, description="Specific account ID")
-):
-    """Get available folders for a provider."""
-    try:
-        # Get account information
-        query = supabase.schema('email_provider').from_('email_accounts')\
-            .select("*")\
-            .eq("user_id", current_user.id)\
-            .eq("provider", provider)\
-            .eq("is_active", True)
+# @data_sync_router.get("/folders/{provider}")
+# async def get_provider_folders(
+#     provider: str,
+#     current_user: UserResponse = Depends(get_current_user_from_token),
+#     account_id: Optional[str] = Query(None, description="Specific account ID")
+# ):
+#     """Get available folders for a provider."""
+#     try:
+#         # Get account information
+#         query = supabase.schema('email_provider').from_('email_accounts')\
+#             .select("*")\
+#             .eq("user_id", current_user.id)\
+#             .eq("provider", provider)\
+#             .eq("is_active", True)
         
-        if account_id:
-            query = query.eq("id", account_id)
+#         if account_id:
+#             query = query.eq("id", account_id)
         
-        result = query.execute()
+#         result = query.execute()
         
-        if not result.data:
-            raise HTTPException(status_code=404, detail="No active accounts found for provider")
+#         if not result.data:
+#             raise HTTPException(status_code=404, detail="No active accounts found for provider")
         
-        # Use first account to get folders
-        account_data = result.data[0]
+#         # Use first account to get folders
+#         account_data = result.data[0]
         
-        if provider.lower() == "google":
-            gmail_service.authenticate_with_tokens(
-                account_data["access_token"],
-                account_data.get("refresh_token")
-            )
-            folders = gmail_service.get_folders()
-        elif provider.lower() == "outlook":
-            outlook_service.authenticate_with_token(account_data["access_token"])
-            folders = outlook_service.get_folders()
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
+#         if provider.lower() == "google":
+#             gmail_service.authenticate_with_tokens(
+#                 account_data["access_token"],
+#                 account_data.get("refresh_token")
+#             )
+#             folders = gmail_service.get_folders()
+#         elif provider.lower() == "outlook":
+#             outlook_service.authenticate_with_token(account_data["access_token"], account_data.get("refresh_token"))
+#             folders = outlook_service.get_folders()
+#         else:
+#             raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
         
-        return {
-            "provider": provider,
-            "account_email": account_data["email"],
-            "folders": folders
-        }
+#         return {
+#             "provider": provider,
+#             "account_email": account_data["email"],
+#             "folders": folders
+#         }
         
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting folders for provider {provider}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get folders: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error getting folders for provider {provider}: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to get folders: {str(e)}")
 
 
 # Background task functions

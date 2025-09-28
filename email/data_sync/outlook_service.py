@@ -9,18 +9,23 @@ import re
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import requests
+import os
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+load_dotenv()
 from .models import EmailMessageCreate, EmailAccount
 
 logger = logging.getLogger(__name__)
 
 # Microsoft Graph API endpoints
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 GRAPH_SCOPES = [
     "https://graph.microsoft.com/Mail.Read",
-    "https://graph.microsoft.com/Mail.ReadWrite"
+    "https://graph.microsoft.com/Mail.Send",
+    "https://graph.microsoft.com/User.Read"
 ]
 
 
@@ -30,6 +35,9 @@ class OutlookService:
     def __init__(self):
         """Initialize Outlook service."""
         self.access_token = None
+        self.refresh_token = None
+        self.client_id = os.getenv("OUTLOOK_CLIENT_ID")
+        self.client_secret = os.getenv("OUTLOOK_CLIENT_SECRET")
         self.session = self._create_session()
     
     def _create_session(self) -> requests.Session:
@@ -45,32 +53,113 @@ class OutlookService:
         session.mount("https://", adapter)
         return session
     
-    def authenticate_with_token(self, access_token: str) -> bool:
+    def authenticate_with_token(self, access_token: str, refresh_token: Optional[str] = None,
+                               client_id: Optional[str] = None, client_secret: Optional[str] = None) -> bool:
         """Authenticate using access token."""
         try:
             self.access_token = access_token
+            self.refresh_token = refresh_token
             
-            # Test the token by making a simple API call
+            # Update client credentials if provided
+            if client_id:
+                self.client_id = client_id
+            if client_secret:
+                self.client_secret = client_secret
+            return self._ensure_valid_token()
+        except Exception as e:
+            logger.error(f"Outlook authentication error: {str(e)}")
+            return False
+    
+    def _is_token_expired(self) -> bool:
+        """Check if the current access token is expired."""
+        if not self.access_token:
+            return True
+            
+        try:
             headers = {
-                'Authorization': f'Bearer {access_token}',
+                'Authorization': f'Bearer {self.access_token}',
                 'Content-Type': 'application/json'
             }
             
             response = self.session.get(
                 f"{GRAPH_BASE_URL}/me",
                 headers=headers,
-                timeout=30
+                timeout=10
             )
             
-            if response.status_code == 200:
+            # If we get 401, the token is expired
+            if response.status_code == 401:
+                logger.info("Access token is expired")
                 return True
+            elif response.status_code == 200:
+                return False
             else:
-                logger.error(f"Outlook authentication failed: {response.status_code} - {response.text}")
+                # For other errors, assume token is still valid
+                logger.warning(f"Token validation returned status {response.status_code}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Outlook authentication error: {str(e)}")
+            logger.error(f"Error checking token validity: {str(e)}")
+            # If we can't check, assume it's expired to be safe
+            return True
+    
+    def _refresh_access_token(self) -> bool:
+        """Refresh the access token using refresh token."""
+        if not self.refresh_token or not self.client_id or not self.client_secret:
+            logger.error("Cannot refresh token: missing refresh_token, client_id, or client_secret")
             return False
+            
+        try:
+            token_url = TOKEN_URL
+            data = {
+                'client_id': self.client_id,
+                'client_secret': self.client_secret,
+                'refresh_token': self.refresh_token,
+                'grant_type': 'refresh_token',
+                'scope': ' '.join(GRAPH_SCOPES)
+            }
+            
+            response = self.session.post(token_url, data=data, timeout=30)
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                new_access_token = token_data.get('access_token')
+                new_refresh_token = token_data.get('refresh_token', self.refresh_token)
+                
+                if new_access_token:
+                    self.access_token = new_access_token
+                    self.refresh_token = new_refresh_token
+                    logger.info("Access token refreshed successfully")
+                    return True
+                else:
+                    logger.error("No access token in refresh response")
+                    return False
+            else:
+                logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error refreshing access token: {str(e)}")
+            return False
+    
+    def _ensure_valid_token(self) -> bool:
+        """Ensure we have a valid access token, refreshing if necessary."""
+        if not self.access_token:
+            logger.error("No access token available")
+            return False
+            
+        if self._is_token_expired():
+            logger.info("Token expired, attempting to refresh...")
+            return self._refresh_access_token()
+        
+        return True
+    
+    def set_token_refresh_callback(self, callback: callable) -> None:
+        """Set a callback function to be called when tokens are refreshed.
+        
+        The callback should accept two parameters: (new_access_token, new_refresh_token)
+        """
+        self.token_refresh_callback = callback
     
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests."""
@@ -82,8 +171,8 @@ class OutlookService:
     def get_folders(self) -> List[Dict[str, str]]:
         """Get list of Outlook mail folders."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             response = self.session.get(
@@ -115,15 +204,15 @@ class OutlookService:
                     query: str = '') -> List[Dict[str, Any]]:
         """Get messages from Outlook."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             
             # Build query parameters
             params = {
                 '$top': min(max_results, 1000),  # Graph API limit
-                '$select': 'id,subject,from,toRecipients,body,receivedDateTime,isRead,parentFolderId,conversationId,internetMessageId',
+                '$select': 'id,subject,from,toRecipients,body,bodyPreview,receivedDateTime,isRead,parentFolderId,conversationId,internetMessageId',
                 '$orderby': 'receivedDateTime desc'
             }
             
@@ -166,6 +255,7 @@ class OutlookService:
             parent_folder_id = msg.get('parentFolderId', '')
             conversation_id = msg.get('conversationId', '')
             internet_message_id = msg.get('internetMessageId', '')
+            snippet = msg.get('bodyPreview', '')
             
             # Extract sender
             sender_info = msg.get('from', {})
@@ -211,6 +301,7 @@ class OutlookService:
                 'internal_date': internal_date,
                 'raw_data': msg,
                 'conversation_id': conversation_id,
+                'snippet': snippet,
                 'internet_message_id': internet_message_id,
                 'parent_folder_id': parent_folder_id
             }
@@ -248,6 +339,10 @@ class OutlookService:
         
         # Try to get folder name from API
         try:
+            if not self._ensure_valid_token():
+                logger.warning("Cannot get folder name: token validation failed")
+                return folder_mappings.get(folder_id.lower(), 'inbox')
+            
             headers = self._get_headers()
             response = self.session.get(
                 f"{GRAPH_BASE_URL}/me/mailFolders/{folder_id}",
@@ -268,8 +363,12 @@ class OutlookService:
                                max_messages: int = 100, folder: Optional[str] = None) -> List[EmailMessageCreate]:
         """Sync Outlook emails to database format."""
         try:
+            # Set tokens
+            self.access_token = account.access_token
+            self.refresh_token = account.refresh_token
+            
             # Authenticate
-            if not self.authenticate_with_token(account.access_token):
+            if not self.authenticate_with_token(account.access_token, account.refresh_token):
                 raise Exception("Failed to authenticate with Outlook")
             
             # Get messages
@@ -284,7 +383,7 @@ class OutlookService:
                 try:
                     email_msg = EmailMessageCreate(
                         message_id=msg['message_id'],
-                        lead_id=None,  # Will be set later if needed
+                        lead_id=msg['conversation_id'],  # Will be set later if needed
                         owner=account.email,
                         sender=msg['sender'],
                         receiver=msg['receiver'],
@@ -293,9 +392,9 @@ class OutlookService:
                         is_read=msg['is_read'],
                         folder=msg['folder'],
                         raw_data=msg['raw_data'],
-                        summary=None,  # Will be generated later
+                        summary=msg['snippet'],  # Will be generated later
                         internal_date=msg['internal_date'],
-                        history_id=msg.get('conversation_id')  # Use conversation_id as history_id
+                        history_id=None  # Outlook doesn't have history_id like Gmail, set to None
                     )
                     email_messages.append(email_msg)
                     
@@ -312,8 +411,8 @@ class OutlookService:
     def get_unread_count(self, folder_id: str = 'inbox') -> int:
         """Get count of unread messages in a folder."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             params = {
@@ -342,8 +441,8 @@ class OutlookService:
     def mark_as_read(self, message_id: str) -> bool:
         """Mark a message as read."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             data = {
@@ -366,8 +465,8 @@ class OutlookService:
     def get_message_thread(self, conversation_id: str) -> List[Dict[str, Any]]:
         """Get all messages in a conversation."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             params = {
@@ -402,8 +501,8 @@ class OutlookService:
     def get_message_attachments(self, message_id: str) -> List[Dict[str, Any]]:
         """Get attachments for a message."""
         try:
-            if not self.access_token:
-                raise Exception("Outlook service not authenticated")
+            if not self._ensure_valid_token():
+                raise Exception("Outlook service not authenticated or token refresh failed")
             
             headers = self._get_headers()
             response = self.session.get(

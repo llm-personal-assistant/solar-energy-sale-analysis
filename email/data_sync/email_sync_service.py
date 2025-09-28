@@ -76,7 +76,6 @@ class EmailSyncService:
         try:
             # Get user's email accounts
             accounts = await self.get_user_email_accounts(sync_request.user_id)
-            print(f"accountsaccountsaccountsaccountsaccounts {accounts}")
             if not accounts:
                 return EmailSyncResult(
                     success=False,
@@ -134,7 +133,6 @@ class EmailSyncService:
     async def sync_emails_for_account(self, account: EmailAccount, user_id: str, 
                                     max_messages: int = 100, folder: Optional[str] = None) -> EmailSyncResult:
         """Sync emails for a specific account."""
-        print(f"accountaccountaccountaccountaccount {account}")
         try:
             # Get emails from provider
             if account.provider.lower() == 'google':
@@ -183,27 +181,28 @@ class EmailSyncService:
                     existing_msg = await self._get_message_by_id(email_msg.message_id, user_id)
                     
                     if existing_msg:
+                        logger.info(f"Message already exists: {email_msg.message_id}")
                         # Update existing message
-                        update_data = EmailMessageUpdate(
-                            lead_id=email_msg.lead_id,
-                            owner=email_msg.owner,
-                            sender=email_msg.sender,
-                            receiver=email_msg.receiver,
-                            subject=email_msg.subject,
-                            body=email_msg.body,
-                            is_read=email_msg.is_read,
-                            folder=email_msg.folder,
-                            raw_data=email_msg.raw_data,
-                            summary=email_msg.summary,
-                            internal_date=email_msg.internal_date,
-                            history_id=email_msg.history_id
-                        )
+                        # update_data = EmailMessageUpdate(
+                        #     lead_id=email_msg.lead_id,
+                        #     owner=email_msg.owner,
+                        #     sender=email_msg.sender,
+                        #     receiver=email_msg.receiver,
+                        #     subject=email_msg.subject,
+                        #     body=email_msg.body,
+                        #     is_read=email_msg.is_read,
+                        #     folder=email_msg.folder,
+                        #     raw_data=email_msg.raw_data,
+                        #     summary=email_msg.summary,
+                        #     internal_date=email_msg.internal_date,
+                        #     history_id=email_msg.history_id
+                        # )
                         
-                        result = await self._update_message(email_msg.message_id, update_data, user_id)
-                        if result.success:
-                            messages_updated += 1
-                        else:
-                            errors.append(f"Failed to update message {email_msg.message_id}: {result.message}")
+                        # result = await self._update_message(email_msg.message_id, update_data, user_id)
+                        # if result.success:
+                        #     messages_updated += 1
+                        # else:
+                        #     errors.append(f"Failed to update message {email_msg.message_id}: {result.message}")
                     else:
                         # Create new message
                         result = await self._create_message(email_msg, user_id)

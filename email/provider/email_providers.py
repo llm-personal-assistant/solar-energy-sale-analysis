@@ -251,7 +251,7 @@ class OutlookEmailProvider:
         app = ConfidentialClientApplication(
             self.client_id,
             authority=self.authority,
-            client_credential="kE18Q~XqHO_OMyRcSl6Wqd5tcT4y6c59ftHMjctx"#self.client_secret
+            client_credential=self.client_secret
         )
         print(f"App: {app}")
         result = app.acquire_token_by_authorization_code(
