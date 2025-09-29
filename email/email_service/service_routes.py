@@ -10,21 +10,19 @@ import uvicorn
 from datetime import datetime, timezone
 
 try:
-    from common.supabase_client import get_supabase_client
     from .email_service import EmailService
     from .models import (
         SendEmailRequest, SaveDraftRequest, EmailMessageResponse, 
-        DraftEmailResponse, EmailStatus
+        DraftEmailResponse, LeadResponse
     )
 except ImportError:
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from common.supabase_client import get_supabase_client
     from email_service import EmailService
     from models import (
         SendEmailRequest, SaveDraftRequest, EmailMessageResponse, 
-        DraftEmailResponse, EmailStatus
+        DraftEmailResponse, LeadResponse
     )
 
 # Import auth module from parent directory
@@ -63,10 +61,10 @@ async def get_email_accounts(current_user = Depends(get_current_user_from_token)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.get("/emails/{account_id}", response_model=List[EmailMessageResponse])
+@service_router.get("/{lead_id}", response_model=List[EmailMessageResponse])
 async def get_emails(
-    account_id: str,
     limit: int = 50,
+    lead_id: str = None,
     current_user = Depends(get_current_user_from_token)
 ):
     """Get emails from a specific account"""
@@ -74,24 +72,58 @@ async def get_emails(
         print(f"current_usercurrent_usercurrent_usercurrent_usercurrent_user {current_user}")
         emails = await email_service.get_emails(
             user_id=current_user.id,
-            account_id=account_id,
+            lead_id=lead_id,
             limit=limit
         )
         return [
             EmailMessageResponse(
-                id=email['id'],
+                id=email['message_id'],
+                lead_id=email['lead_id'],
                 subject=email['subject'],
                 sender=email['sender'],
-                recipient=email['recipient'],
+                recipient=email['receiver'],
                 body=email['body'],
-                timestamp=email['timestamp'],
-                is_read=email['is_read'],
-                status=EmailStatus.RECEIVED
+                summary=email['summary'],
+                internal_date=email['internal_date'],
+                is_read=email['is_read']
             )
             for email in emails
         ]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@service_router.get("/leads", response_model=List[LeadResponse])
+async def get_leads(
+    limit: int = 100,
+    current_user = Depends(get_current_user_from_token)
+):
+    """Get emails from a specific account"""
+    try:
+        print(f"current_usercurrent_usercurrent_usercurrent_usercurrent_user {current_user}")
+        leads = await email_service.get_leads(
+            user_id=current_user.id,
+            limit=limit
+        )
+
+        print(f"leadsleadsleadsleadsleads {leads[0]['id']}")
+        leads_response = []
+        for lead in leads:
+            print(f"leadleadleadleadlead  {lead['id']}")
+            print(f"leadleadleadleadlead owner {lead['owner']}")
+            print(f"leadleadleadleadlead subject {lead['subject']}")
+            print(f"leadleadleadleadlead internal_date {lead['internal_date']}")
+            leads_response.append(LeadResponse(
+                id=lead['id'],
+                owner=lead['owner'],
+                subject=lead['subject'],
+                internal_date=lead['internal_date']))
+        print(f"leads_responseleads_responseleads_responseleads_responseleads_response {leads_response}")
+        return  leads_response
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @service_router.post("/send-email/{account_id}")
 async def send_email(

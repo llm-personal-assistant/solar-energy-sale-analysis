@@ -38,4 +38,4 @@ def get_supabase_client() -> SupabaseClient:
 
 if __name__ == "__main__":
     client = get_supabase_client()
-    print(supabase_health(client.get_client()))
+ 

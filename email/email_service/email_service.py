@@ -59,50 +59,50 @@ class GoogleEmailService:
         self.client_id = os.getenv("GOOGLE_CLIENT_ID") 
         self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     
-    async def get_emails(self, access_token: str, limit: int = 50, refresh_token: str = None) -> List[Dict[str, Any]]:
-        print(f"access_tokenaccess_tokenaccess_tokenaccess_tokenaccess_token {access_token}")
-        print(f"refresh_tokenrefresh_tokenrefresh_tokenrefresh_tokenrefresh_token {refresh_token}") 
-        print(f"client_idclient_idclient_idclient_idclient_id {os.getenv("GOOGLE_CLIENT_ID")}")
-        print(f"client_secretclient_secretclient_secretclient_secretclient_secret {os.getenv("GOOGLE_CLIENT_SECRET")}")    
-        credentials = Credentials(
-            token=access_token,
-            refresh_token=refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.getenv("GOOGLE_CLIENT_ID"),
-            client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
-        )
+    # async def get_emails(self, access_token: str, limit: int = 50, refresh_token: str = None) -> List[Dict[str, Any]]:
+    #     print(f"access_tokenaccess_tokenaccess_tokenaccess_tokenaccess_token {access_token}")
+    #     print(f"refresh_tokenrefresh_tokenrefresh_tokenrefresh_tokenrefresh_token {refresh_token}") 
+    #     print(f"client_idclient_idclient_idclient_idclient_id {os.getenv("GOOGLE_CLIENT_ID")}")
+    #     print(f"client_secretclient_secretclient_secretclient_secretclient_secret {os.getenv("GOOGLE_CLIENT_SECRET")}")    
+    #     credentials = Credentials(
+    #         token=access_token,
+    #         refresh_token=refresh_token,
+    #         token_uri="https://oauth2.googleapis.com/token",
+    #         client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    #         client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
+    #     )
 
-        service = build('gmail', 'v1', credentials=credentials)
+    #     service = build('gmail', 'v1', credentials=credentials)
         
-        # Get list of messages
-        results = service.users().messages().list(userId='me', maxResults=limit).execute()
-        messages = results.get('messages', [])
+    #     # Get list of messages
+    #     results = service.users().messages().list(userId='me', maxResults=limit).execute()
+    #     messages = results.get('messages', [])
         
-        emails = []
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id']).execute()
+    #     emails = []
+    #     for message in messages:
+    #         msg = service.users().messages().get(userId='me', id=message['id']).execute()
             
-            # Extract headers
-            headers = msg['payload'].get('headers', [])
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            recipient = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown Recipient')
-            date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+    #         # Extract headers
+    #         headers = msg['payload'].get('headers', [])
+    #         subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+    #         sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
+    #         recipient = next((h['value'] for h in headers if h['name'] == 'To'), 'Unknown Recipient')
+    #         date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
             
-            # Extract body
-            body = self._extract_body(msg['payload'])
+    #         # Extract body
+    #         body = self._extract_body(msg['payload'])
             
-            emails.append({
-                'id': message['id'],
-                'subject': subject,
-                'sender': sender,
-                'recipient': recipient,
-                'body': body,
-                'timestamp': _parse_email_timestamp(date),
-                'is_read': 'UNREAD' not in msg['labelIds']
-            })
+    #         emails.append({
+    #             'id': message['id'],
+    #             'subject': subject,
+    #             'sender': sender,
+    #             'recipient': recipient,
+    #             'body': body,
+    #             'timestamp': _parse_email_timestamp(date),
+    #             'is_read': 'UNREAD' not in msg['labelIds']
+    #         })
         
-        return emails
+    #     return emails
     
     def _extract_body(self, payload: Dict) -> str:
         """Extract email body from Gmail API payload"""
@@ -154,32 +154,32 @@ class OutlookEmailService:
     def __init__(self):
         pass
     
-    async def get_emails(self, access_token: str, limit: int = 50) -> List[Dict[str, Any]]:
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
+    # async def get_emails(self, access_token: str, limit: int = 50) -> List[Dict[str, Any]]:
+    #     headers = {
+    #         'Authorization': f'Bearer {access_token}',
+    #         'Content-Type': 'application/json'
+    #     }
         
-        url = f"https://graph.microsoft.com/v1.0/me/messages?$top={limit}&$orderby=receivedDateTime desc"
+    #     url = f"https://graph.microsoft.com/v1.0/me/messages?$top={limit}&$orderby=receivedDateTime desc"
         
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+    #     async with httpx.AsyncClient() as client:
+    #         response = await client.get(url, headers=headers)
+    #         response.raise_for_status()
+    #         data = response.json()
         
-        emails = []
-        for message in data.get('value', []):
-            emails.append({
-                'id': message['id'],
-                'subject': message.get('subject', 'No Subject'),
-                'sender': message['from']['emailAddress']['address'],
-                'recipient': message['toRecipients'][0]['emailAddress']['address'] if message.get('toRecipients') else '',
-                'body': message.get('body', {}).get('content', ''),
-                'timestamp': message['receivedDateTime'],
-                'is_read': message.get('isRead', False)
-            })
+    #     emails = []
+    #     for message in data.get('value', []):
+    #         emails.append({
+    #             'id': message['id'],
+    #             'subject': message.get('subject', 'No Subject'),
+    #             'sender': message['from']['emailAddress']['address'],
+    #             'recipient': message['toRecipients'][0]['emailAddress']['address'] if message.get('toRecipients') else '',
+    #             'body': message.get('body', {}).get('content', ''),
+    #             'timestamp': message['receivedDateTime'],
+    #             'is_read': message.get('isRead', False)
+    #         })
         
-        return emails
+    #     return emails
     
     async def send_email(self, access_token: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
         headers = {
@@ -216,6 +216,11 @@ class EmailService:
             'outlook': OutlookEmailService()
         }
         self.admin = get_supabase_client().get_admin_client()
+        self.email_schema_name = 'email'
+        self.email_provider_schema_name = 'email_provider'
+        self.email_message_name = 'email_message'
+        self.email_account_name = 'email_accounts'
+        self.lead_name = 'email_lead'
     
     def _normalize_user_id(self, user_id) -> str:
         try:
@@ -228,7 +233,7 @@ class EmailService:
             return str(user_id)
     
     async def get_user_email_accounts(self, user_id: str) -> List[Dict[str, Any]]:
-        result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('user_id', user_id).execute()
+        result = self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).select('*').eq('user_id', user_id).execute()
         return result.data
     
     async def _refresh_and_save_tokens(self, account_id: str, provider_name: str, credentials) -> Dict[str, str]:
@@ -246,7 +251,7 @@ class EmailService:
                 'updated_at': datetime.now(timezone.utc).isoformat()
             }
             
-            self.admin.schema('email_provider').from_('email_accounts').update(update_data).eq('id', account_id).execute()
+            self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).update(update_data).eq('id', account_id).execute()
             print(f"Refreshed tokens for account {account_id}")
             
             return {
@@ -290,51 +295,64 @@ class EmailService:
             # For other providers, return the access token as-is
             return None
 
-    async def get_emails(self, user_id: str, account_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_emails(self, user_id: str, lead_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         # Get account details
         print(f"user_iduser_iduser_iduser_iduser_id {user_id}")
-        account_result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).select('*').eq('user_id', user_id).execute()
         print(f"account_resultaccount_resultaccount_resultaccount_resultaccount_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
         
         account = account_result.data[0]
-        new_credentials = await self._get_credentials_with_refresh(account)
-        
-        if new_credentials:
-            print(f"new_credentialsnew_credentialsnew_credentialsnew_credentialsnew_credentials {new_credentials.token}")
-            print(f"new_credentialsnew_credentialsnew_credentialsnew_credentialsnew_credentials {new_credentials.refresh_token}")
-            account['access_token'] = new_credentials.token
-            account['refresh_token'] = new_credentials.refresh_token
+   
         
         # Get emails from provider
         if account['provider'] not in self.services:
             raise ValueError(f"Unsupported provider: {account['provider']}")
         
-        service = self.services[account['provider']]
-        emails = await service.get_emails(account['access_token'], limit, account.get('refresh_token'))
+        print(f"lead_idlead_idlead_idlead_idlead_id {lead_id}")
+        print(f"user_iduser_iduser_iduser_iduser_id {user_id}")
         
+        
+        email_result = self.admin.schema(self.email_schema_name).from_(self.email_message_name).select('*').eq('user_id', user_id).eq('lead_id', lead_id).limit(limit).execute()
+        emails = email_result.data
+        print(f"emails emails emails emails emails {len(emails)}")
         # Store emails in database
+        result = []
         for email in emails:
             email_data = {
-                'account_id': account_id,
-                'message_id': email['id'],
+                'user_id': user_id,
+                'lead_id': email['lead_id'],
+                'message_id': email['message_id'],
                 'subject': email['subject'],
                 'sender': email['sender'],
-                'recipient': email['recipient'],
+                'receiver': email['receiver'],
                 'body': email['body'],
-                'timestamp': email['timestamp'],
+                'summary': email['summary'],
+                'internal_date': email['internal_date'],
                 'is_read': email['is_read']
             }
-            email_message = self.admin.schema('email').from_('email_messages').select('*').eq('account_id', account_id).eq('message_id', email['id']).limit(1).execute()
-            if not email_message.data:
-                self.admin.schema('email').from_('email_messages').upsert(email_data).execute()
-        
-        return emails
+            result.append(email_data)
+            
+        return result
+
+    async def get_leads(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        lead_result = self.admin.schema(self.email_schema_name).from_(self.lead_name).select('*').eq('user_id', user_id).limit(limit).execute()
+        leads = lead_result.data
+        result = [] 
+        for lead in leads:
+            lead_data = {
+                'id': lead['lead_id'],
+                'owner': lead['owner'],
+                'subject': lead['subject'],
+                'internal_date': lead['internal_date']
+            }
+            result.append(lead_data)
+        return result
     
     async def send_email(self, user_id: str, account_id: str, to_emails: List[str], subject: str, body: str, is_html: bool = False) -> str:
         # Get account details
-        account_result = self.admin.schema('email_provider').from_('email_accounts').select('*').eq('id', account_id).eq('user_id', user_id).execute()
+        account_result = self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).select('*').eq('id', account_id).eq('user_id', user_id).execute()
         
         if not account_result.data:
             raise ValueError("Account not found")

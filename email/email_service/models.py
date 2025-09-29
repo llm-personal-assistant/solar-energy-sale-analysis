@@ -3,10 +3,10 @@ from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
-class EmailStatus(str, Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    RECEIVED = "received"
+# class EmailStatus(str, Enum):
+#     DRAFT = "draft"
+#     SENT = "sent"
+#     RECEIVED = "received"
 
 class User(BaseModel):
     id: str
@@ -35,7 +35,7 @@ class EmailMessage(BaseModel):
     body: str
     timestamp: datetime
     is_read: bool = False
-    status: EmailStatus = EmailStatus.RECEIVED
+    # status: EmailStatus = EmailStatus.RECEIVED
     created_at: datetime
 
 class DraftEmail(BaseModel):
@@ -63,13 +63,21 @@ class SaveDraftRequest(BaseModel):
 
 class EmailMessageResponse(BaseModel):
     id: str
+    lead_id: str
     subject: str
     sender: str
     recipient: str
     body: str
-    timestamp: str
+    summary: str
+    internal_date: datetime
     is_read: bool
-    status: EmailStatus
+    # status: EmailStatus
+
+class LeadResponse(BaseModel):
+    id: str
+    owner: str
+    subject: str
+    internal_date: datetime
 
 class DraftEmailResponse(BaseModel):
     id: str
