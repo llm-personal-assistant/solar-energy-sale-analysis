@@ -264,7 +264,6 @@ class EmailService:
     
     async def _get_credentials_with_refresh(self, account: Dict[str, Any]) -> Any:
         """Get credentials with automatic refresh capability"""
-        print(f"accountaccountaccountaccountaccount {account}")
         if account['provider'] == 'google':
             credentials = Credentials(
                 token=account['access_token'],
@@ -273,15 +272,6 @@ class EmailService:
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
             )
-            print("client_idclient_idclient_idclient_idclient_id")
-            print(os.getenv("GOOGLE_CLIENT_ID"))
-            print("client_secretclient_secretclient_secretclient_secretclient_secret")
-            print(os.getenv("GOOGLE_CLIENT_SECRET"))
-
-            print("credentialscredentialscredentialscredentialscredentials")
-            print(credentials.valid)
-            print(credentials.expired)
-            print(credentials.refresh_token)
             # Check if token is expired and refresh if needed
             if not credentials.valid:
                 if credentials.expired and credentials.refresh_token:
@@ -297,26 +287,18 @@ class EmailService:
 
     async def get_emails(self, user_id: str, lead_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         # Get account details
-        print(f"user_iduser_iduser_iduser_iduser_id {user_id}")
         account_result = self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).select('*').eq('user_id', user_id).execute()
         print(f"account_resultaccount_resultaccount_resultaccount_resultaccount_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
         
         account = account_result.data[0]
-   
-        
         # Get emails from provider
         if account['provider'] not in self.services:
             raise ValueError(f"Unsupported provider: {account['provider']}")
         
-        print(f"lead_idlead_idlead_idlead_idlead_id {lead_id}")
-        print(f"user_iduser_iduser_iduser_iduser_id {user_id}")
-        
-        
         email_result = self.admin.schema(self.email_schema_name).from_(self.email_message_name).select('*').eq('user_id', user_id).eq('lead_id', lead_id).limit(limit).execute()
         emails = email_result.data
-        print(f"emails emails emails emails emails {len(emails)}")
         # Store emails in database
         result = []
         for email in emails:
