@@ -2,10 +2,9 @@ from supabase import create_client, Client
 import os
 from typing import Optional
 from dotenv import load_dotenv
-
+load_dotenv()
 class SupabaseClient:
     def __init__(self):
-        load_dotenv()
         self.url = os.getenv("SUPABASE_URL")
         self.key = os.getenv("SUPABASE_ANON_KEY")
         self.service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")

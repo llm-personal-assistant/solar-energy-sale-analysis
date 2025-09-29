@@ -19,8 +19,13 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
-from .models import EmailMessageCreate, EmailAccount
+try:
+    from .models import EmailMessageCreate, EmailAccount, EmailLeadDisplay
+except Exception as e:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models import EmailMessageCreate, EmailAccount, EmailLeadDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +257,7 @@ class GmailService:
         
         return 'inbox'  # Default
     
-    def get_emails_messages(self, account: EmailAccount, user_id: str, 
+    def get_message_for_database(self, account: EmailAccount, user_id: str, 
                                max_messages: int = 100, folder: Optional[str] = None) -> List[EmailMessageCreate]:
         """Sync Gmail emails to database format."""
         try:
@@ -265,6 +270,7 @@ class GmailService:
                 folder_id=folder or 'INBOX',
                 max_results=max_messages
             )
+            print(f"messages messages messages messages messages {len(messages)}")
             # Convert to EmailMessageCreate objects
             email_messages = []
             for msg in messages:
@@ -297,6 +303,7 @@ class GmailService:
         except Exception as e:
             logger.error(f"Error syncing Gmail emails: {str(e)}")
             return []
+    
     
     def get_unread_count(self, folder_id: str = 'INBOX') -> int:
         """Get count of unread messages in a folder."""

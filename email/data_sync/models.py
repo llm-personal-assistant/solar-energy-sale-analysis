@@ -82,6 +82,13 @@ class EmailLeadBase(BaseModel):
     priority_level: PriorityLevel = Field(..., description="Priority level")
 
 
+class EmailLeadDisplay(BaseModel):
+    """Base model for email lead data."""
+    lead_id: str = Field(..., description="Unique identifier for the lead")
+    owner: Optional[str] = Field(None, max_length=255, description="Owner of the lead")
+    subject: Optional[str] = Field(None, description="Email subject")
+    internal_date: Optional[int] = Field(None, description="Internal date timestamp")
+
 class EmailLeadCreate(EmailLeadBase):
     """Model for creating a new email lead."""
     pass

@@ -15,8 +15,14 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 load_dotenv()
-from .models import EmailMessageCreate, EmailAccount
-
+try:
+    from .models import EmailMessageCreate, EmailAccount, EmailLeadDisplay
+except Exception as e:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models import EmailMessageCreate, EmailAccount, EmailLeadDisplay
+    
 logger = logging.getLogger(__name__)
 
 # Microsoft Graph API endpoints
@@ -359,7 +365,7 @@ class OutlookService:
         # Fallback to mapping
         return folder_mappings.get(folder_id.lower(), 'inbox')
     
-    def sync_emails_to_database(self, account: EmailAccount, user_id: str, 
+    def get_message_for_database(self, account: EmailAccount, user_id: str, 
                                max_messages: int = 100, folder: Optional[str] = None) -> List[EmailMessageCreate]:
         """Sync Outlook emails to database format."""
         try:
@@ -407,6 +413,9 @@ class OutlookService:
         except Exception as e:
             logger.error(f"Error syncing Outlook emails: {str(e)}")
             return []
+
+    
+    
     
     def get_unread_count(self, folder_id: str = 'inbox') -> int:
         """Get count of unread messages in a folder."""

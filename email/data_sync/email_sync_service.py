@@ -9,18 +9,20 @@ from datetime import datetime
 from supabase import Client
 try:
     from .models import (
-        EmailMessage, EmailMessageCreate, EmailMessageUpdate,
+        EmailMessage, EmailMessageCreate, EmailMessageUpdate,EmailLeadDisplay,
         EmailAccount, EmailSyncRequest, EmailSyncResult, DataSyncResponse
     )
     from .gmail_service import GmailService
     from .outlook_service import OutlookService
     from common.supabase_client import get_supabase_client
 except Exception as e:
+    print("Error in email_sync_service.py")
+    print(e)
     import sys
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from models import (
-        EmailMessage, EmailMessageCreate, EmailMessageUpdate,
+        EmailMessage, EmailMessageCreate, EmailMessageUpdate,EmailLeadDisplay,
         EmailAccount, EmailSyncRequest, EmailSyncResult, DataSyncResponse
     )
     from gmail_service import GmailService
@@ -40,6 +42,7 @@ class EmailSyncService:
         self.schema = "email"
         self.message_table = "email_message"
         self.account_table = "email_accounts"
+        self.lead_table = "email_lead"
     
     async def get_user_email_accounts(self, user_id: str) -> List[EmailAccount]:
         """Get all email accounts for a user."""
@@ -136,11 +139,11 @@ class EmailSyncService:
         try:
             # Get emails from provider
             if account.provider.lower() == 'google':
-                email_messages = self.gmail_service.sync_emails_to_database(
+                email_messages = self.gmail_service.get_message_for_database(
                     account, user_id, max_messages, folder
-                )
+                )    
             elif account.provider.lower() == 'outlook':
-                email_messages = self.outlook_service.sync_emails_to_database(
+                email_messages = self.outlook_service.get_message_for_database(
                     account, user_id, max_messages, folder
                 )
             else:
@@ -156,6 +159,16 @@ class EmailSyncService:
                     messages_synced=0,
                     errors=[]
                 )
+            
+            lead_messages = self.get_leads_for_database(email_messages)
+            lead_result =   await self._sync_leads_to_database(lead_messages, user_id)
+
+            if not lead_result.success:
+                return EmailSyncResult(
+                    success=False,
+                    messages_synced=0,
+                    errors=lead_result.errors
+                )
             # Sync to database
             return await self._sync_messages_to_database(email_messages, user_id)
             
@@ -166,6 +179,31 @@ class EmailSyncService:
                 messages_synced=0,
                 errors=[str(e)]
             )
+
+    def get_leads_for_database(self, email_messages: List[EmailMessageCreate]) -> List[EmailLeadDisplay]:
+        """Sync lead to database."""
+        try:
+            lead_messages = []
+            for msg in email_messages:
+                lead_id = msg.lead_id
+                if lead_id:
+                    lead_owner = msg.receiver
+                    msg_owner = msg.owner
+                    receiver = msg.receiver
+                    sender = msg.sender
+                    if msg_owner in receiver:
+                        lead_owner = sender
+                    lead_msg = EmailLeadDisplay(
+                        lead_id=lead_id,
+                        owner=lead_owner,
+                        subject=msg.subject,
+                        internal_date=msg.internal_date,
+                    )
+                    lead_messages.append(lead_msg)
+            return lead_messages
+        except Exception as e:
+            logger.error(f"Error syncing lead to database: {str(e)}")
+            return []
     
     async def _sync_messages_to_database(self, email_messages: List[EmailMessageCreate], 
                                        user_id: str) -> EmailSyncResult:
@@ -229,6 +267,92 @@ class EmailSyncService:
             return EmailSyncResult(
                 success=False,
                 messages_synced=0,
+                errors=[str(e)]
+            )
+
+    async def _sync_leads_to_database(self, lead_messages: List[EmailLeadDisplay], user_id: str) -> EmailSyncResult:
+        """Sync lead to database."""
+        try:
+            messages_created = 0
+            messages_updated = 0
+            errors = []
+            for lead_msg in lead_messages:
+                existing_lead = await self._get_lead_by_id(lead_msg.lead_id, user_id)
+                if existing_lead:
+                    logger.info(f"Lead already exists: {lead_msg.lead_id}")
+                    messages_updated += 1
+                else:
+                    result = await self._create_lead(lead_msg, user_id)
+                    if result.success:
+                        messages_created += 1
+                    else:
+                        errors.append(f"Failed to create lead {lead_msg.lead_id}: {result.message}")
+            return EmailSyncResult(
+                success=True,
+                messages_synced=messages_created + messages_updated,
+                messages_created=messages_created,
+                messages_updated=messages_updated,
+                errors=errors
+            )
+        except Exception as e:
+            logger.error(f"Error syncing leads to database: {str(e)}")
+            return EmailSyncResult(
+                success=False,
+                messages_synced=0,
+                errors=[str(e)]
+            )
+    
+    async def _get_lead_by_id(self, lead_id: str, user_id: str) -> Optional[EmailLeadDisplay]:
+        """Get a lead by ID."""
+        try:
+            result = self.supabase.schema(self.schema).from_(self.lead_table)\
+                .select("*")\
+                .eq("lead_id", lead_id)\
+                .eq("user_id", user_id)\
+                .execute()
+            
+            if result.data:
+                return EmailLeadDisplay(**result.data[0])
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting lead {lead_id}: {str(e)}")
+            return None
+
+    async def _create_lead(self, lead_msg: EmailLeadDisplay, user_id: str) -> DataSyncResponse:
+        """Create a new lead."""
+        try:
+            # Prepare data for insertion
+            lead_dict = lead_msg.dict()
+            lead_dict["user_id"] = user_id
+            lead_dict["lead_id"] = lead_msg.lead_id
+            lead_dict["owner"] = lead_msg.owner
+            lead_dict["subject"] = lead_msg.subject
+            lead_dict["internal_date"] = lead_msg.internal_date
+            lead_dict["created_at"] = datetime.utcnow().isoformat()
+            lead_dict["updated_at"] = datetime.utcnow().isoformat()
+            
+            # Insert into Supabase
+            result = self.supabase.schema(self.schema).from_(self.lead_table).insert(lead_dict).execute()
+            
+            if result.data:
+                return DataSyncResponse(
+                    success=True,
+                    message="Lead created successfully",
+                    data={"lead_id": result.data[0]["lead_id"]}
+                )
+            else:
+                return DataSyncResponse(
+                    success=False,
+                    message="Failed to create lead",
+                    errors=["No data returned from database"]
+                )
+                
+        except Exception as e:
+            logger.error(f"Error creating lead: {str(e)}")
+            return DataSyncResponse(
+                success=False,
+                message="Error creating lead",
                 errors=[str(e)]
             )
     
