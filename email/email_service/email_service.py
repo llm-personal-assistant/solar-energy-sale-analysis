@@ -288,7 +288,6 @@ class EmailService:
     async def get_emails(self, user_id: str, lead_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         # Get account details
         account_result = self.admin.schema(self.email_provider_schema_name).from_(self.email_account_name).select('*').eq('user_id', user_id).execute()
-        print(f"account_resultaccount_resultaccount_resultaccount_resultaccount_result {account_result}")
         if not account_result.data:
             raise ValueError("Account not found")
         
