@@ -296,7 +296,7 @@ class EmailService:
         if account['provider'] not in self.services:
             raise ValueError(f"Unsupported provider: {account['provider']}")
         
-        email_result = self.admin.schema(self.email_schema_name).from_(self.email_message_name).select('*').eq('user_id', user_id).eq('lead_id', lead_id).limit(limit).execute()
+        email_result = self.admin.schema(self.email_schema_name).from_(self.email_message_name).select('*').eq('user_id', user_id).eq('lead_id', lead_id).order('internal_date', desc=True).limit(limit).execute()
         emails = email_result.data
         # Store emails in database
         result = []

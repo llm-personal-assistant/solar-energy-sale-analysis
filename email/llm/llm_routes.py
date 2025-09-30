@@ -6,13 +6,14 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 import logging
 
-from .models import LLMRequest, LLMResponse, ChatRequest, ChatResponse, ChatMessage, ChatRole
+from .models import LLMRequest, LLMResponse
 from .openai_service import OpenAIService, get_openai_service
 
 # Import authentication dependencies
 try:
     from ..auth.auth_routes import get_current_user_from_token
     from ..auth.models import UserResponse
+    from ..email_service.email_service import EmailService
 except ImportError:
     # Handle relative import issues
     import sys
@@ -20,18 +21,20 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from auth.auth_routes import get_current_user_from_token
     from auth.models import UserResponse
+    from email_service.email_service import EmailService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+email_service = EmailService()
 # Create router
 llm_router = APIRouter(prefix="/llm", tags=["LLM"])
 
 
-@llm_router.post("/process", response_model=LLMResponse)
+@llm_router.get("/analysis/{lead_id}", response_model=LLMResponse)
 async def process_text_with_prompt(
-    request: LLMRequest,
+    lead_id: str,
     current_user: UserResponse = Depends(get_current_user_from_token),
     openai_service: OpenAIService = Depends(get_openai_service)
 ):
@@ -43,6 +46,32 @@ async def process_text_with_prompt(
   
     """
     try:
+        emails = await email_service.get_emails(
+            user_id=current_user.id,
+            lead_id=lead_id,
+            limit=100
+        )
+        if len(emails) == 0:
+            raise HTTPException(status_code=400, detail=f"No emails found for lead: {lead_id}")
+        
+        lead_text = ""
+        for email in emails:
+            if lead_text == "":
+                lead_text = f"Subject: {email['subject']}\nSender: {email['sender']}\nReceiver: {email['receiver']}\nBody: {email['body']}\n\n"
+            else:
+                lead_text +=  f"Subject: {email['subject']}\nSender: {email['sender']}\nReceiver: {email['receiver']}\nBody: {email['body']}\n\n"
+
+        lead_text = lead_text.strip()
+        prompt = "Analyze the sentiment of the following email. Respond with: Positive, Negative, or Neutral, followed by a brief explanation."
+
+        print(f"lead_text: {lead_text}")
+        request = LLMRequest(
+                text=lead_text,
+                prompt=prompt,
+                model="gpt-4o",
+                max_tokens=10000,
+                temperature=0.0
+            )
         logger.info(f"User {current_user.email} processing text with prompt: {request.prompt[:50]}...")
         response = openai_service.process_text_with_prompt(request)
         

@@ -4,6 +4,7 @@ OpenAI API service for LLM functionality
 
 import os
 import openai
+from openai import OpenAI
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 import logging
@@ -29,7 +30,7 @@ class OpenAIService:
         
         # Initialize OpenAI client
         openai.api_key = self.api_key
-        self.client = openai.OpenAI(api_key=self.api_key)
+        self.client = OpenAI(api_key=self.api_key, base_url="https://api.openai.com/v1")
         
         # Default model settings
         self.default_model = "gpt-4o"
@@ -74,9 +75,9 @@ class OpenAIService:
                 "temperature": request.temperature
             }
             
-            # Add max_tokens if specified
-            if request.max_tokens:
-                api_params["max_tokens"] = request.max_tokens
+            # # Add max_tokens if specified
+            # if request.max_tokens:
+            #     api_params["max_tokens"] = request.max_tokens
             
             # Make API call
             logger.info(f"Making OpenAI API call with model: {request.model}")

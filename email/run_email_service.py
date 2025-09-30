@@ -17,6 +17,7 @@ try:
     from .provider.provider_routes import provider_router
     from .auth.auth_routes import auth_router
     from .data_sync.data_sync_routes import data_sync_router
+    from .llm.llm_routes import llm_router
 except ImportError:
     import sys
     import os
@@ -25,6 +26,7 @@ except ImportError:
     from provider.provider_routes import provider_router
     from auth.auth_routes import auth_router
     from data_sync.data_sync_routes import data_sync_router
+    from llm.llm_routes import llm_router
 # Add the current directory to Python path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
@@ -48,7 +50,7 @@ app.include_router(provider_router)
 app.include_router(auth_router)
 app.include_router(service_router)
 app.include_router(data_sync_router)
-
+app.include_router(llm_router)
 
 # Import and run the FastAPI app
 if __name__ == "__main__":
