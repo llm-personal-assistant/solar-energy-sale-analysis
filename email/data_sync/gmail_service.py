@@ -275,8 +275,6 @@ class GmailService:
             email_messages = []
             for msg in messages:
                 try:
-                    print(f"lead_id lead_id lead_id lead_id lead_id {msg.get('lead_id', '')}")
-                    print(f"snippet snippet snippet snippet snippet {msg.get('summary', '')}")
                     email_msg = EmailMessageCreate(
                         message_id=msg['message_id'],
                         lead_id=msg.get('lead_id', ''),  # Will be set later if needed
