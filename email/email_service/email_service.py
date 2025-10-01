@@ -307,6 +307,7 @@ class EmailService:
                 'message_id': email['message_id'],
                 'subject': email['subject'],
                 'sender': email['sender'],
+                'owner': email['owner'],
                 'receiver': email['receiver'],
                 'body': email['body'],
                 'summary': email['summary'],

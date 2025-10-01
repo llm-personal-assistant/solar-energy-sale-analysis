@@ -178,194 +178,194 @@ async def sync_emails(
         raise HTTPException(status_code=500, detail=f"Failed to sync emails: {str(e)}")
 
 
-@data_sync_router.post("/sync/account/{account_id}", response_model=SyncEmailsResponse)
-async def sync_account_emails(
-    account_id: str,
-    current_user: UserResponse = Depends(get_current_user_from_token),
-    max_messages: int = Query(100, ge=1, le=1000, description="Maximum number of messages to sync"),
-    folder: Optional[str] = Query(None, description="Specific folder to sync"),
-    background_sync: bool = Query(False, description="Whether to run sync in background")
-):
-    """Sync emails for a specific account."""
-    try:
-        # Get account information
-        account_result = supabase.schema('email_provider').from_('email_accounts')\
-            .select("*")\
-            .eq("id", account_id)\
-            .eq("user_id", current_user.id)\
-            .eq("is_active", True)\
-            .execute()
+# @data_sync_router.post("/sync/account/{account_id}", response_model=SyncEmailsResponse)
+# async def sync_account_emails(
+#     account_id: str,
+#     current_user: UserResponse = Depends(get_current_user_from_token),
+#     max_messages: int = Query(100, ge=1, le=1000, description="Maximum number of messages to sync"),
+#     folder: Optional[str] = Query(None, description="Specific folder to sync"),
+#     background_sync: bool = Query(False, description="Whether to run sync in background")
+# ):
+#     """Sync emails for a specific account."""
+#     try:
+#         # Get account information
+#         account_result = supabase.schema('email_provider').from_('email_accounts')\
+#             .select("*")\
+#             .eq("id", account_id)\
+#             .eq("user_id", current_user.id)\
+#             .eq("is_active", True)\
+#             .execute()
         
-        if not account_result.data:
-            raise HTTPException(status_code=404, detail="Account not found or inactive")
+#         if not account_result.data:
+#             raise HTTPException(status_code=404, detail="Account not found or inactive")
         
-        account_data = account_result.data[0]
-        account = EmailAccount(
-            id=account_data["id"],
-            user_id=account_data["user_id"],
-            email=account_data["email"],
-            provider=account_data["provider"],
-            access_token=account_data["access_token"],
-            refresh_token=account_data.get("refresh_token"),
-            is_active=account_data["is_active"],
-            created_at=datetime.fromisoformat(account_data["created_at"].replace('Z', '+00:00')),
-            updated_at=datetime.fromisoformat(account_data["updated_at"].replace('Z', '+00:00'))
-        )
+#         account_data = account_result.data[0]
+#         account = EmailAccount(
+#             id=account_data["id"],
+#             user_id=account_data["user_id"],
+#             email=account_data["email"],
+#             provider=account_data["provider"],
+#             access_token=account_data["access_token"],
+#             refresh_token=account_data.get("refresh_token"),
+#             is_active=account_data["is_active"],
+#             created_at=datetime.fromisoformat(account_data["created_at"].replace('Z', '+00:00')),
+#             updated_at=datetime.fromisoformat(account_data["updated_at"].replace('Z', '+00:00'))
+#         )
         
-        if background_sync:
-            # Run sync in background
-            background_tasks = BackgroundTasks()
-            background_tasks.add_task(
-                _background_sync_account,
-                account,
-                current_user.id,
-                max_messages,
-                folder
-            )
+#         if background_sync:
+#             # Run sync in background
+#             background_tasks = BackgroundTasks()
+#             background_tasks.add_task(
+#                 _background_sync_account,
+#                 account,
+#                 current_user.id,
+#                 max_messages,
+#                 folder
+#             )
             
-            return SyncEmailsResponse(
-                success=True,
-                message=f"Email sync started in background for account {account.email}",
-                data={"background_sync": True, "account_email": account.email}
-            )
-        else:
-            # Run sync synchronously
-            result = await email_sync_service.sync_emails_for_account(
-                account, current_user.id, max_messages, folder
-            )
+#             return SyncEmailsResponse(
+#                 success=True,
+#                 message=f"Email sync started in background for account {account.email}",
+#                 data={"background_sync": True, "account_email": account.email}
+#             )
+#         else:
+#             # Run sync synchronously
+#             result = await email_sync_service.sync_emails_for_account(
+#                 account, current_user.id, max_messages, folder
+#             )
             
-            return SyncEmailsResponse(
-                success=result.success,
-                message=f"Synced {result.messages_synced} messages from {account.email}",
-                data={
-                    "account_email": account.email,
-                    "messages_synced": result.messages_synced,
-                    "messages_created": result.messages_created,
-                    "messages_updated": result.messages_updated,
-                    "sync_time": result.sync_time.isoformat()
-                },
-                errors=result.errors if result.errors else None
-            )
+#             return SyncEmailsResponse(
+#                 success=result.success,
+#                 message=f"Synced {result.messages_synced} messages from {account.email}",
+#                 data={
+#                     "account_email": account.email,
+#                     "messages_synced": result.messages_synced,
+#                     "messages_created": result.messages_created,
+#                     "messages_updated": result.messages_updated,
+#                     "sync_time": result.sync_time.isoformat()
+#                 },
+#                 errors=result.errors if result.errors else None
+#             )
             
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error syncing emails for account {account_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to sync account emails: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error syncing emails for account {account_id}: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to sync account emails: {str(e)}")
 
 
-@data_sync_router.get("/status", response_model=SyncStatusResponse)
-async def get_sync_status(
-    current_user: UserResponse = Depends(get_current_user_from_token)
-):
-    """Get sync status for a user."""
-    try:
-        status = await email_sync_service.get_sync_status(current_user.id)
+# @data_sync_router.get("/status", response_model=SyncStatusResponse)
+# async def get_sync_status(
+#     current_user: UserResponse = Depends(get_current_user_from_token)
+# ):
+#     """Get sync status for a user."""
+#     try:
+#         status = await email_sync_service.get_sync_status(current_user.id)
         
-        return SyncStatusResponse(
-            total_messages=status["total_messages"],
-            unread_messages=status["unread_messages"],
-            folder_counts=status["folder_counts"],
-            latest_sync=datetime.fromisoformat(status["latest_sync"]) if status["latest_sync"] else None
-        )
+#         return SyncStatusResponse(
+#             total_messages=status["total_messages"],
+#             unread_messages=status["unread_messages"],
+#             folder_counts=status["folder_counts"],
+#             latest_sync=datetime.fromisoformat(status["latest_sync"]) if status["latest_sync"] else None
+#         )
         
-    except Exception as e:
-        logger.error(f"Error getting sync status for user {current_user.id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Error getting sync status for user {current_user.id}: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
 
 
-@data_sync_router.get("/messages", response_model=MessagesResponse)
-async def get_user_messages(
-    current_user: UserResponse = Depends(get_current_user_from_token),
-    limit: int = Query(50, ge=1, le=500, description="Number of messages to return"),
-    offset: int = Query(0, ge=0, description="Number of messages to skip"),
-    folder: Optional[str] = Query(None, description="Filter by folder"),
-    unread_only: bool = Query(False, description="Only return unread messages")
-):
-    """Get messages for a user."""
-    try:
-        # Build query
-        query = supabase.schema("email_provider").from_("email_message")\
-            .select("*")\
-            .eq("user_id", current_user.id)\
-            .order("created_at", desc=True)\
-            .range(offset, offset + limit - 1)
+# @data_sync_router.get("/messages", response_model=MessagesResponse)
+# async def get_user_messages(
+#     current_user: UserResponse = Depends(get_current_user_from_token),
+#     limit: int = Query(50, ge=1, le=500, description="Number of messages to return"),
+#     offset: int = Query(0, ge=0, description="Number of messages to skip"),
+#     folder: Optional[str] = Query(None, description="Filter by folder"),
+#     unread_only: bool = Query(False, description="Only return unread messages")
+# ):
+#     """Get messages for a user."""
+#     try:
+#         # Build query
+#         query = supabase.schema("email_provider").from_("email_message")\
+#             .select("*")\
+#             .eq("user_id", current_user.id)\
+#             .order("created_at", desc=True)\
+#             .range(offset, offset + limit - 1)
         
-        if folder:
-            query = query.eq("folder", folder)
+#         if folder:
+#             query = query.eq("folder", folder)
         
-        if unread_only:
-            query = query.eq("is_read", False)
+#         if unread_only:
+#             query = query.eq("is_read", False)
         
-        result = query.execute()
+#         result = query.execute()
         
-        messages = []
-        for msg_data in result.data:
-            message = EmailMessage(
-                message_id=msg_data["message_id"],
-                lead_id=msg_data.get("lead_id"),
-                user_id=msg_data["user_id"],
-                owner=msg_data.get("owner"),
-                sender=msg_data.get("sender"),
-                receiver=msg_data.get("receiver"),
-                subject=msg_data.get("subject"),
-                body=msg_data.get("body"),
-                is_read=msg_data["is_read"],
-                folder=msg_data.get("folder"),
-                raw_data=msg_data.get("raw_data"),
-                summary=msg_data.get("summary"),
-                internal_date=msg_data.get("internal_date"),
-                history_id=msg_data.get("history_id"),
-                created_at=datetime.fromisoformat(msg_data["created_at"].replace('Z', '+00:00')),
-                updated_at=datetime.fromisoformat(msg_data["updated_at"].replace('Z', '+00:00'))
-            )
-            messages.append(message)
+#         messages = []
+#         for msg_data in result.data:
+#             message = EmailMessage(
+#                 message_id=msg_data["message_id"],
+#                 lead_id=msg_data.get("lead_id"),
+#                 user_id=msg_data["user_id"],
+#                 owner=msg_data.get("owner"),
+#                 sender=msg_data.get("sender"),
+#                 receiver=msg_data.get("receiver"),
+#                 subject=msg_data.get("subject"),
+#                 body=msg_data.get("body"),
+#                 is_read=msg_data["is_read"],
+#                 folder=msg_data.get("folder"),
+#                 raw_data=msg_data.get("raw_data"),
+#                 summary=msg_data.get("summary"),
+#                 internal_date=msg_data.get("internal_date"),
+#                 history_id=msg_data.get("history_id"),
+#                 created_at=datetime.fromisoformat(msg_data["created_at"].replace('Z', '+00:00')),
+#                 updated_at=datetime.fromisoformat(msg_data["updated_at"].replace('Z', '+00:00'))
+#             )
+#             messages.append(message)
         
-        # Get total count
-        count_query = supabase.schema("email_provider").from_("email_message")\
-            .select("message_id", count="exact")\
-            .eq("user_id", current_user.id)
+#         # Get total count
+#         count_query = supabase.schema("email_provider").from_("email_message")\
+#             .select("message_id", count="exact")\
+#             .eq("user_id", current_user.id)
         
-        if folder:
-            count_query = count_query.eq("folder", folder)
+#         if folder:
+#             count_query = count_query.eq("folder", folder)
         
-        if unread_only:
-            count_query = count_query.eq("is_read", False)
+#         if unread_only:
+#             count_query = count_query.eq("is_read", False)
         
-        count_result = count_query.execute()
-        total = count_result.count if count_result.count else 0
+#         count_result = count_query.execute()
+#         total = count_result.count if count_result.count else 0
         
-        return MessagesResponse(
-            messages=messages,
-            total=total,
-            page=offset // limit + 1,
-            limit=limit
-        )
+#         return MessagesResponse(
+#             messages=messages,
+#             total=total,
+#             page=offset // limit + 1,
+#             limit=limit
+#         )
         
-    except Exception as e:
-        logger.error(f"Error getting messages for user {current_user.id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Error getting messages for user {current_user.id}: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
 
 
-@data_sync_router.patch("/messages/{message_id}/read")
-async def mark_message_as_read(
-    message_id: str,
-    current_user: UserResponse = Depends(get_current_user_from_token)
-):
-    """Mark a message as read."""
-    try:
-        result = await email_sync_service.mark_message_as_read(message_id, current_user.id)
+# @data_sync_router.patch("/messages/{message_id}/read")
+# async def mark_message_as_read(
+#     message_id: str,
+#     current_user: UserResponse = Depends(get_current_user_from_token)
+# ):
+#     """Mark a message as read."""
+#     try:
+#         result = await email_sync_service.mark_message_as_read(message_id, current_user.id)
         
-        if result.success:
-            return {"success": True, "message": "Message marked as read"}
-        else:
-            raise HTTPException(status_code=400, detail=result.message)
+#         if result.success:
+#             return {"success": True, "message": "Message marked as read"}
+#         else:
+#             raise HTTPException(status_code=400, detail=result.message)
             
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error marking message {message_id} as read: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to mark message as read: {str(e)}")
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f"Error marking message {message_id} as read: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Failed to mark message as read: {str(e)}")
 
 
 # @data_sync_router.get("/folders/{provider}")

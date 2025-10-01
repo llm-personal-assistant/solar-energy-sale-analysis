@@ -55,39 +55,39 @@ class EmailAccountResponse(BaseModel):
 async def root():
     return {"message": "Email Provider API is running"}
 
-@provider_router.post("/register-email-provider", response_model=EmailAccountResponse)
-async def register_email_provider(
-    registration: UserRegistration,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Register a new email provider for the user"""
-    try:
-        # Validate provider
-        if registration.provider not in ['google', 'outlook', 'yahoo']:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid provider. Must be 'google', 'outlook', or 'yahoo'"
-            )
+# @provider_router.post("/register-email-provider", response_model=EmailAccountResponse)
+# async def register_email_provider(
+#     registration: UserRegistration,
+#     current_user = Depends(get_current_user_from_token)
+# ):
+#     """Register a new email provider for the user"""
+#     try:
+#         # Validate provider
+#         if registration.provider not in ['google', 'outlook', 'yahoo']:
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="Invalid provider. Must be 'google', 'outlook', or 'yahoo'"
+#             )
         
-        # Create email account
-        account = await email_manager.create_email_account(
-            user_id=current_user.id,
-            email=registration.email,
-            provider=registration.provider,
-            access_token=registration.access_token,
-            refresh_token=registration.refresh_token
-        )
+#         # Create email account
+#         account = await email_manager.create_email_account(
+#             user_id=current_user.id,
+#             email=registration.email,
+#             provider=registration.provider,
+#             access_token=registration.access_token,
+#             refresh_token=registration.refresh_token
+#         )
         
-        return EmailAccountResponse(
-            id=account['id'],
-            email=account['email'],
-            provider=account['provider'],
-            is_active=account['is_active'],
-            created_at=account['created_at']
-        )
+#         return EmailAccountResponse(
+#             id=account['id'],
+#             email=account['email'],
+#             provider=account['provider'],
+#             is_active=account['is_active'],
+#             created_at=account['created_at']
+#         )
         
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 @provider_router.get("/email-accounts", response_model=List[EmailAccountResponse])
 async def get_email_accounts(current_user = Depends(get_current_user_from_token)):

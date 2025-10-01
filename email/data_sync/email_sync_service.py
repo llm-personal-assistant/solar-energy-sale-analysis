@@ -160,8 +160,8 @@ class EmailSyncService:
                     errors=[]
                 )
             
-            lead_messages = self.get_leads_for_database(email_messages)
-            lead_result =   await self._sync_leads_to_database(lead_messages, user_id)
+            lead_messages = self.get_leads_for_database(email_messages, account)
+            lead_result =   await self._sync_leads_to_database(lead_messages, account)
 
             if not lead_result.success:
                 return EmailSyncResult(
@@ -180,7 +180,7 @@ class EmailSyncService:
                 errors=[str(e)]
             )
 
-    def get_leads_for_database(self, email_messages: List[EmailMessageCreate]) -> List[EmailLeadDisplay]:
+    def get_leads_for_database(self, email_messages: List[EmailMessageCreate], account: EmailAccount) -> List[EmailLeadDisplay]:
         """Sync lead to database."""
         try:
             lead_messages = []
@@ -188,11 +188,8 @@ class EmailSyncService:
                 lead_id = msg.lead_id
                 if lead_id:
                     lead_owner = msg.receiver
-                    msg_owner = msg.owner
-                    receiver = msg.receiver
-                    sender = msg.sender
-                    if msg_owner in receiver:
-                        lead_owner = sender
+                    if account.email in msg.receiver:
+                        lead_owner = msg.sender
                     lead_msg = EmailLeadDisplay(
                         lead_id=lead_id,
                         owner=lead_owner,
@@ -270,19 +267,19 @@ class EmailSyncService:
                 errors=[str(e)]
             )
 
-    async def _sync_leads_to_database(self, lead_messages: List[EmailLeadDisplay], user_id: str) -> EmailSyncResult:
+    async def _sync_leads_to_database(self, lead_messages: List[EmailLeadDisplay], account: EmailAccount) -> EmailSyncResult:
         """Sync lead to database."""
         try:
             messages_created = 0
             messages_updated = 0
             errors = []
             for lead_msg in lead_messages:
-                existing_lead = await self._get_lead_by_id(lead_msg.lead_id, user_id)
+                existing_lead = await self._get_lead_by_id(lead_msg.lead_id, account.user_id)
                 if existing_lead:
                     logger.info(f"Lead already exists: {lead_msg.lead_id}")
                     messages_updated += 1
                 else:
-                    result = await self._create_lead(lead_msg, user_id)
+                    result = await self._create_lead(lead_msg, account.user_id)
                     if result.success:
                         messages_created += 1
                     else:

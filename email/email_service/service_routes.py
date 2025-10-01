@@ -100,25 +100,19 @@ async def get_leads(
 ):
     """Get emails from a specific account"""
     try:
-        print(f"current_usercurrent_usercurrent_usercurrent_usercurrent_user {current_user}")
+    
         leads = await email_service.get_leads(
             user_id=current_user.id,
             limit=limit
         )
 
-        print(f"leadsleadsleadsleadsleads {leads[0]['id']}")
         leads_response = []
         for lead in leads:
-            print(f"leadleadleadleadlead  {lead['id']}")
-            print(f"leadleadleadleadlead owner {lead['owner']}")
-            print(f"leadleadleadleadlead subject {lead['subject']}")
-            print(f"leadleadleadleadlead internal_date {lead['internal_date']}")
             leads_response.append(LeadResponse(
                 id=lead['id'],
                 owner=lead['owner'],
                 subject=lead['subject'],
                 internal_date=lead['internal_date']))
-        print(f"leads_responseleads_responseleads_responseleads_responseleads_response {leads_response}")
         return  leads_response
         
     except Exception as e:
@@ -182,106 +176,106 @@ async def save_draft(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.get("/drafts", response_model=List[DraftEmailResponse])
-async def get_drafts(current_user = Depends(get_current_user_from_token)):
-    """Get all draft emails for the current user"""
-    try:
-        drafts = await email_service.get_drafts(current_user.id)
-        return [
-            DraftEmailResponse(
-                id=draft['id'],
-                to=draft['to'],
-                subject=draft['subject'],
-                body=draft['body'],
-                is_html=draft['is_html'],
-                created_at=draft['created_at'],
-                updated_at=draft['updated_at']
-            )
-            for draft in drafts
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @service_router.get("/drafts", response_model=List[DraftEmailResponse])
+# async def get_drafts(current_user = Depends(get_current_user_from_token)):
+#     """Get all draft emails for the current user"""
+#     try:
+#         drafts = await email_service.get_drafts(current_user.id)
+#         return [
+#             DraftEmailResponse(
+#                 id=draft['id'],
+#                 to=draft['to'],
+#                 subject=draft['subject'],
+#                 body=draft['body'],
+#                 is_html=draft['is_html'],
+#                 created_at=draft['created_at'],
+#                 updated_at=draft['updated_at']
+#             )
+#             for draft in drafts
+#         ]
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.get("/drafts/{draft_id}", response_model=DraftEmailResponse)
-async def get_draft(
-    draft_id: str,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Get a specific draft email"""
-    try:
-        draft = await email_service.get_draft(current_user.id, draft_id)
-        return DraftEmailResponse(
-            id=draft['id'],
-            to=draft['to'],
-            subject=draft['subject'],
-            body=draft['body'],
-            is_html=draft['is_html'],
-            created_at=draft['created_at'],
-            updated_at=draft['updated_at']
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# @service_router.get("/drafts/{draft_id}", response_model=DraftEmailResponse)
+# async def get_draft(
+#     draft_id: str,
+#     current_user = Depends(get_current_user_from_token)
+# ):
+#     """Get a specific draft email"""
+#     try:
+#         draft = await email_service.get_draft(current_user.id, draft_id)
+#         return DraftEmailResponse(
+#             id=draft['id'],
+#             to=draft['to'],
+#             subject=draft['subject'],
+#             body=draft['body'],
+#             is_html=draft['is_html'],
+#             created_at=draft['created_at'],
+#             updated_at=draft['updated_at']
+#         )
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.put("/drafts/{draft_id}", response_model=DraftEmailResponse)
-async def update_draft(
-    draft_id: str,
-    draft_request: SaveDraftRequest,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Update a draft email"""
-    try:
-        draft = await email_service.update_draft(
-            user_id=current_user.id,
-            draft_id=draft_id,
-            to_emails=draft_request.to,
-            subject=draft_request.subject,
-            body=draft_request.body,
-            is_html=draft_request.is_html
-        )
+# @service_router.put("/drafts/{draft_id}", response_model=DraftEmailResponse)
+# async def update_draft(
+#     draft_id: str,
+#     draft_request: SaveDraftRequest,
+#     current_user = Depends(get_current_user_from_token)
+# ):
+#     """Update a draft email"""
+#     try:
+#         draft = await email_service.update_draft(
+#             user_id=current_user.id,
+#             draft_id=draft_id,
+#             to_emails=draft_request.to,
+#             subject=draft_request.subject,
+#             body=draft_request.body,
+#             is_html=draft_request.is_html
+#         )
         
-        return DraftEmailResponse(
-            id=draft['id'],
-            to=draft['to'],
-            subject=draft['subject'],
-            body=draft['body'],
-            is_html=draft['is_html'],
-            created_at=draft['created_at'],
-            updated_at=draft['updated_at']
-        )
+#         return DraftEmailResponse(
+#             id=draft['id'],
+#             to=draft['to'],
+#             subject=draft['subject'],
+#             body=draft['body'],
+#             is_html=draft['is_html'],
+#             created_at=draft['created_at'],
+#             updated_at=draft['updated_at']
+#         )
         
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.delete("/drafts/{draft_id}")
-async def delete_draft(
-    draft_id: str,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Delete a draft email"""
-    try:
-        await email_service.delete_draft(current_user.id, draft_id)
-        return {"message": "Draft deleted successfully"}
+# @service_router.delete("/drafts/{draft_id}")
+# async def delete_draft(
+#     draft_id: str,
+#     current_user = Depends(get_current_user_from_token)
+# ):
+#     """Delete a draft email"""
+#     try:
+#         await email_service.delete_draft(current_user.id, draft_id)
+#         return {"message": "Draft deleted successfully"}
         
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
-@service_router.post("/send-draft/{draft_id}/{account_id}")
-async def send_draft(
-    draft_id: str,
-    account_id: str,
-    current_user = Depends(get_current_user_from_token)
-):
-    """Send a draft email"""
-    try:
-        result = await email_service.send_draft(
-            user_id=current_user.id,
-            draft_id=draft_id,
-            account_id=account_id
-        )
-        return {"message": "Draft sent successfully", "message_id": result}
+# @service_router.post("/send-draft/{draft_id}/{account_id}")
+# async def send_draft(
+#     draft_id: str,
+#     account_id: str,
+#     current_user = Depends(get_current_user_from_token)
+# ):
+#     """Send a draft email"""
+#     try:
+#         result = await email_service.send_draft(
+#             user_id=current_user.id,
+#             draft_id=draft_id,
+#             account_id=account_id
+#         )
+#         return {"message": "Draft sent successfully", "message_id": result}
         
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 email_app = FastAPI(
     title="Email Service API",

@@ -48,6 +48,9 @@ class LLMResponse(BaseModel):
     model_used: Optional[str] = None
     tokens_used: Optional[int] = None
     error: Optional[str] = None
+    lead_id: Optional[str] = None
+    lead_subject: Optional[str] = None
+    lead_owner: Optional[str] = None
     
     class Config:
         json_schema_extra = {
@@ -55,7 +58,11 @@ class LLMResponse(BaseModel):
                 "success": True,
                 "content": "The email content shows a positive sentiment with enthusiastic language...",
                 "model_used": "gpt-4o",
-                "tokens_used": 45
+                "tokens_used": 45,
+                "lead_id": "123",
+                "lead_subject": "Hello, how are you?",
+                "lead_sender": "John Doe",
+                "lead_receiver": "Jane Doe"
             }
         }
 
