@@ -3,7 +3,6 @@ OpenAI API service for LLM functionality
 """
 
 import os
-import openai
 from openai import OpenAI
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
@@ -29,8 +28,7 @@ class OpenAIService:
             raise ValueError("OPENAI_API_KEY must be set in environment variables")
         
         # Initialize OpenAI client
-        openai.api_key = self.api_key
-        self.client = OpenAI(api_key=self.api_key, base_url="https://api.openai.com/v1")
+        self.client = OpenAI(api_key=self.api_key)
         
         # Default model settings
         self.default_model = "gpt-4o"
